@@ -1,0 +1,189 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { ClipboardCheck, Loader2, Plus, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+
+interface Report {
+  id: string;
+  status: string;
+  aiScore: string | null;
+  recommendation: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  document: {
+    id: string;
+    name: string;
+    docType: string;
+  };
+}
+
+export default function ProjectReportsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const projectId = params.projectId as string;
+  const { toast } = useToast();
+
+  const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchReports();
+  }, [projectId]);
+
+  async function fetchReports() {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/reports`);
+      if (response.ok) {
+        const data = await response.json();
+        setReports(data.reports);
+      }
+    } catch (error) {
+      console.error("获取报告列表失败:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case "in_progress":
+        return <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />;
+      default:
+        return <Clock className="h-5 w-5 text-gray-400" />;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "已完成";
+      case "in_progress":
+        return "审查中";
+      default:
+        return "待审查";
+    }
+  };
+
+  const getDocTypeLabel = (docType: string) => {
+    switch (docType) {
+      case "tender_doc":
+        return "招标文件";
+      case "legal_doc":
+        return "法律文件";
+      case "bid_doc":
+        return "投标文件";
+      default:
+        return docType;
+    }
+  };
+
+  const getRecommendationLabel = (rec: string | null) => {
+    switch (rec) {
+      case "pass":
+        return { label: "通过", color: "bg-green-100 text-green-700" };
+      case "fail":
+        return { label: "不通过", color: "bg-red-100 text-red-700" };
+      case "revise":
+        return { label: "整改后通过", color: "bg-yellow-100 text-yellow-700" };
+      default:
+        return null;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 头部 */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">审查报告</h2>
+          <p className="text-muted-foreground">
+            查看和管理项目的审查报告
+          </p>
+        </div>
+        <Link href={`/projects/${projectId}/reports/new`}>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            创建审查任务
+          </Button>
+        </Link>
+      </div>
+
+      {/* 报告列表 */}
+      {reports.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <ClipboardCheck className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">暂无审查报告</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              创建审查任务，对已解析的文档进行合规性审查
+            </p>
+            <Link href={`/projects/${projectId}/reports/new`}>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                创建审查任务
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {reports.map((report) => (
+            <Link
+              key={report.id}
+              href={`/reports/${report.id}`}
+              className="block"
+            >
+              <Card className="hover:border-primary transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div className="flex items-center gap-4">
+                    {getStatusIcon(report.status)}
+                    <div>
+                      <CardTitle className="text-base">
+                        {report.document.name}
+                      </CardTitle>
+                      <CardDescription>
+                        {getDocTypeLabel(report.document.docType)} ·
+                        {new Date(report.createdAt).toLocaleDateString("zh-CN")}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {report.aiScore && (
+                      <div className="text-lg font-bold text-primary">
+                        {report.aiScore}分
+                      </div>
+                    )}
+                    {report.recommendation && (
+                      <Badge className={getRecommendationLabel(report.recommendation)?.color}>
+                        {getRecommendationLabel(report.recommendation)?.label}
+                      </Badge>
+                    )}
+                    <Badge variant="outline">
+                      {getStatusLabel(report.status)}
+                    </Badge>
+                  </div>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
