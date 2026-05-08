@@ -287,7 +287,7 @@ export default function DocumentDetailPage() {
 
       {/* 文档内容 */}
       {document.parseStatus === "completed" && parsedResult && (
-        <Card>
+        <Card className="shadow-sm bg-muted/20">
           <CardHeader>
             <CardTitle>文档内容预览</CardTitle>
             <CardDescription>

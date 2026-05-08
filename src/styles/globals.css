@@ -14,16 +14,20 @@
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    /* Linear-ish neutrals: slightly cooler and a bit more contrast */
+    --muted: 210 40% 97.3%;
+    --muted-foreground: 215.4 16.3% 42.5%;
+    --accent: 210 40% 96.8%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    /* crisper borders */
+    --border: 214.3 31.8% 89%;
+    --input: 214.3 31.8% 89%;
+    /* focus ring closer to primary */
+    --ring: 199 89% 48%;
+    /* slightly sharper corners for modern UI */
+    --radius: 0.625rem;
   }
 
   .dark {
@@ -45,7 +49,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --ring: 160 84% 39%;
   }
 }
 
@@ -54,6 +58,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
 }

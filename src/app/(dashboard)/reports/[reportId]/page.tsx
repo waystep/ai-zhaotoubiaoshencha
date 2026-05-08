@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ClipboardCheck,
@@ -110,17 +110,7 @@ export default function ReportDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  useEffect(() => {
-    fetchReport();
-  }, [reportId]);
-
-  useEffect(() => {
-    if (report?.document.id && report.status === "completed") {
-      fetchDocumentBlocks();
-    }
-  }, [report?.document.id, report?.status]);
-
-  async function fetchReport() {
+  const fetchReport = useCallback(async () => {
     try {
       const response = await fetch(`/api/reports/${reportId}`);
       if (response.ok) {
@@ -138,9 +128,9 @@ export default function ReportDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [reportId, toast]);
 
-  async function fetchDocumentBlocks() {
+  const fetchDocumentBlocks = useCallback(async () => {
     if (!report?.document.id) return;
     try {
       const response = await fetch(`/api/documents/${report.document.id}/blocks`);
@@ -151,7 +141,17 @@ export default function ReportDetailPage() {
     } catch (error) {
       console.error("获取文档区块失败:", error);
     }
-  }
+  }, [report?.document.id]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  useEffect(() => {
+    if (report?.document.id && report.status === "completed") {
+      fetchDocumentBlocks();
+    }
+  }, [report?.document.id, report?.status, fetchDocumentBlocks]);
 
   async function handleGenerateReport() {
     setIsGenerating(true);
@@ -176,7 +176,7 @@ export default function ReportDetailPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "网络错误",
         description: "请检查网络连接",
@@ -195,11 +195,6 @@ export default function ReportDetailPage() {
   function handleLocateClick(issue: Issue) {
     selectIssue(issue);
     setActiveTab("location");
-  }
-
-  function handlePreviewClick(issue: Issue) {
-    selectIssue(issue);
-    setActiveTab("preview");
   }
 
   function handlePageChange(pageNumber: number) {
@@ -463,7 +458,7 @@ export default function ReportDetailPage() {
           </TabsContent>
 
           <TabsContent value="preview">
-            <Card>
+            <Card className="shadow-sm bg-muted/20">
               <CardHeader>
                 <CardTitle>文档内容预览</CardTitle>
                 <CardDescription>
@@ -497,7 +492,7 @@ export default function ReportDetailPage() {
                 onIssueClick={handleLocateClick}
                 selectedIssueId={selectedIssueId}
               />
-              <Card>
+              <Card className="shadow-sm bg-muted/20">
                 <CardHeader>
                   <CardTitle>当前页预览</CardTitle>
                   <CardDescription>

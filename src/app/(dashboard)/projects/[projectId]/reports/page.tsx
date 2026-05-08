@@ -82,14 +82,6 @@ export default function ProjectReportsPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return reports.filter((r) => {
@@ -113,6 +105,14 @@ export default function ProjectReportsPage() {
       label: `搜索：${q.trim()}`,
       onRemove: () => setQ(""),
     });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (

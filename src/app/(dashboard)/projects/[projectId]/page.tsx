@@ -156,7 +156,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
       {/* 快速操作 */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="shadow-sm bg-muted/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -181,7 +181,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm bg-muted/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 text-primary" />

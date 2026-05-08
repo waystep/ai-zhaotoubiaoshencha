@@ -82,7 +82,7 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl text-center">链接无效</CardTitle>
           <CardDescription className="text-center">
@@ -102,7 +102,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md shadow-sm">
       <CardHeader className="space-y-1">
         <div className="flex items-center gap-2 mb-2">
           <ClipboardCheck className="h-8 w-8 text-primary" />
@@ -197,7 +197,7 @@ function ResetPasswordForm() {
 
 function ResetFallback() {
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md shadow-sm">
       <CardContent className="flex justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </CardContent>

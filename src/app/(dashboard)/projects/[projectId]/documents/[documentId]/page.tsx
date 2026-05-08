@@ -455,7 +455,7 @@ export default function DocumentDetailPage() {
 
           {/* 概览 */}
           <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">总页数</CardTitle>
@@ -476,7 +476,7 @@ export default function DocumentDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">文档标题</CardTitle>
                 </CardHeader>
@@ -485,7 +485,7 @@ export default function DocumentDetailPage() {
                     {parsedResult.structuredContent.title || document.originalName}
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
 
             {/* 章节列表 */}

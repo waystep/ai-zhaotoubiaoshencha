@@ -33,7 +33,7 @@ function validatePassword(password: string): string | undefined {
 
 function BrandSection() {
   return (
-    <div className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-[#667EEA] lg:to-[#764BA2] lg:px-12">
+    <div className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-primary/80 lg:to-primary lg:px-12">
       <div className="max-w-lg space-y-6 text-center">
         <div className="flex items-center justify-center gap-3">
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
@@ -197,29 +197,29 @@ function LoginForm() {
     <div className="min-h-screen flex">
       <BrandSection />
       
-      <div className="flex-1 flex items-center justify-center bg-white p-4 sm:p-8">
+      <div className="flex-1 flex items-center justify-center bg-background p-4 sm:p-8">
         <div className="w-full max-w-[400px]">
           <div className="hidden sm:flex items-center justify-between mb-8">
             <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-8 w-8 text-cyan-600" />
-              <span className="text-xl font-bold text-slate-900">智能招标审查平台</span>
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+              <span className="text-xl font-bold text-foreground">智能招标审查平台</span>
             </div>
             <Link
               href="/register"
-              className="px-4 py-2 text-sm font-medium text-cyan-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-primary bg-muted rounded-lg hover:bg-muted/70 transition-colors"
             >
               注册
             </Link>
           </div>
 
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-sm">
             <CardHeader className="sm:hidden space-y-1 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ClipboardCheck className="h-7 w-7 text-cyan-600" />
-                  <span className="text-lg font-bold text-slate-900">智能招标审查平台</span>
+                  <ClipboardCheck className="h-7 w-7 text-primary" />
+                  <span className="text-lg font-bold text-foreground">智能招标审查平台</span>
                 </div>
-                <Link href="/register" className="text-sm font-medium text-cyan-600">
+                <Link href="/register" className="text-sm font-medium text-primary">
                   注册
                 </Link>
               </div>
@@ -251,7 +251,7 @@ function LoginForm() {
                       onBlur={handleEmailBlur}
                       disabled={isLoading}
                       className={cn(
-                        "h-12 pl-10 bg-white border-slate-200 rounded-xl",
+                        "h-11 pl-10",
                         errors.email && touched.email && "border-destructive focus-visible:ring-destructive"
                       )}
                       aria-describedby={errors.email ? "email-error" : undefined}
@@ -269,7 +269,7 @@ function LoginForm() {
                     <Label htmlFor="password">密码</Label>
                     <Link
                       href="/forgot-password"
-                      className="text-sm text-cyan-600 hover:underline"
+                      className="text-sm text-primary hover:underline"
                     >
                       忘记密码?
                     </Link>
@@ -286,7 +286,7 @@ function LoginForm() {
                       onBlur={handlePasswordBlur}
                       disabled={isLoading}
                       className={cn(
-                        "h-12 pl-10 pr-10 bg-white border-slate-200 rounded-xl",
+                        "h-11 pl-10 pr-10",
                         errors.password && touched.password && "border-destructive focus-visible:ring-destructive"
                       )}
                       aria-describedby={errors.password ? "password-error" : undefined}
@@ -328,7 +328,7 @@ function LoginForm() {
               <CardFooter className="flex flex-col space-y-4">
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-cyan-600 hover:bg-cyan-700"
+                  className="w-full h-11"
                   disabled={isLoading || !isFormValid}
                 >
                   {isLoading ? (
@@ -399,7 +399,7 @@ function LoginForm() {
                 </div>
                 <p className="text-center text-sm text-slate-600">
                   还没有账号?{" "}
-                  <Link href="/register" className="font-medium text-cyan-600 hover:underline">
+                  <Link href="/register" className="font-medium text-primary hover:underline">
                     立即注册
                   </Link>
                 </p>

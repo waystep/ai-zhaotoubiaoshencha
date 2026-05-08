@@ -46,7 +46,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-sm">
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-4">
             <ClipboardCheck className="h-8 w-8 text-primary" />
