@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { PdfViewer } from "@/components/document/pdf-viewer";
 
 interface ParsedBlock {
   id: string;
@@ -449,6 +450,7 @@ export default function DocumentDetailPage() {
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">概览</TabsTrigger>
+            <TabsTrigger value="source">源文件预览</TabsTrigger>
             <TabsTrigger value="content">全文内容</TabsTrigger>
             <TabsTrigger value="blocks">区块详情</TabsTrigger>
           </TabsList>
@@ -516,6 +518,19 @@ export default function DocumentDetailPage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* 源文件预览 */}
+          <TabsContent value="source">
+            <Card className="shadow-sm bg-muted/20">
+              <CardHeader>
+                <CardTitle>源文件预览</CardTitle>
+                <CardDescription>展示原始 PDF 文件（不依赖解析结果）</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PdfViewer documentId={documentId} blocks={[]} highlightedIssues={[]} />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* 全文内容 */}

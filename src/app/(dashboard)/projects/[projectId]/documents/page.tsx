@@ -590,7 +590,7 @@ export default function ProjectDocumentsPage() {
                       key={doc.id}
                       className={cn(isSelected && "ring-2 ring-primary/30 border-primary/40")}
                     >
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-3">
+                      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <input
                             type="checkbox"
@@ -611,7 +611,7 @@ export default function ProjectDocumentsPage() {
                             </CardDescription>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-4 shrink-0 flex-wrap justify-end">
+                        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-4 shrink-0">
                           <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
                             <div className="flex items-center gap-2">
                               {getParseStatusIcon(doc.parseStatus)}
