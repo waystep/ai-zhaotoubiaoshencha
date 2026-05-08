@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ClipboardCheck, Loader2, FileText, ArrowLeft } from "lucide-react";
+import { ClipboardCheck, Loader2, FileText, ArrowLeft, Bot, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,16 @@ interface Document {
   createdAt: string;
 }
 
+interface AgentInfo {
+  agent: {
+    id: string;
+    name: string;
+  };
+}
+
+// 审查步骤状态
+type ReviewStep = "select" | "creating" | "analyzing" | "completed" | "error";
+
 export default function NewReportPage() {
   const router = useRouter();
   const params = useParams();
@@ -24,11 +34,18 @@ export default function NewReportPage() {
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
+  const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
+
+  // 审查流程状态
+  const [reviewStep, setReviewStep] = useState<ReviewStep>("select");
+  const [reviewProgress, setReviewProgress] = useState("");
+  const [reportId, setReportId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDocuments();
+    fetchAgentInfo();
   }, [projectId]);
 
   async function fetchDocuments() {
@@ -36,7 +53,6 @@ export default function NewReportPage() {
       const response = await fetch(`/api/projects/${projectId}/documents`);
       if (response.ok) {
         const data = await response.json();
-        // 只显示已解析完成的文档
         const parsedDocs = data.documents.filter(
           (doc: Document) => doc.parseStatus === "completed"
         );
@@ -49,48 +65,86 @@ export default function NewReportPage() {
     }
   }
 
-  async function handleCreateReport() {
+  async function fetchAgentInfo() {
+    try {
+      const response = await fetch("/api/mastra/review?action=info");
+      if (response.ok) {
+        const data = await response.json();
+        setAgentInfo(data);
+      }
+    } catch (error) {
+      console.error("获取 Agent 信息失败:", error);
+    }
+  }
+
+  // 开始审查流程
+  async function handleStartReview() {
     if (!selectedDoc) {
       toast({
         title: "请选择文档",
-        description: "请选择要审查的文档",
+        description: "请选择要审查的投标文件",
         variant: "destructive",
       });
       return;
     }
 
-    setIsCreating(true);
+    setError(null);
+    setReviewStep("creating");
+    setReviewProgress("正在创建审查任务...");
+
     try {
-      // 创建审查报告
-      const response = await fetch(`/api/projects/${projectId}/reports`, {
+      // 步骤1: 创建审查报告
+      const createResponse = await fetch(`/api/projects/${projectId}/reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ documentId: selectedDoc }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        toast({
-          title: "审查任务已创建",
-          description: "正在准备审查，请稍候查看结果",
-        });
-        router.push(`/reports/${data.report.id}`);
-      } else {
-        const error = await response.json();
-        toast({
-          title: "创建失败",
-          description: error.error,
-          variant: "destructive",
-        });
+      if (!createResponse.ok) {
+        const err = await createResponse.json();
+        throw new Error(err.error || "创建报告失败");
       }
-    } catch {
+
+      const createData = await createResponse.json();
+      const newReportId = createData.report.id;
+      setReportId(newReportId);
+      setReviewProgress("AI 正在规划审查方案...");
+
+      // 步骤2: 开始 AI 审查
+      setReviewStep("analyzing");
+      setReviewProgress("AI 正在分析文档内容...");
+
+      const generateResponse = await fetch(`/api/reports/${newReportId}/generate`, {
+        method: "POST",
+      });
+
+      if (!generateResponse.ok) {
+        const err = await generateResponse.json();
+        throw new Error(err.error || "AI 审查失败");
+      }
+
+      const generateData = await generateResponse.json();
+      setReviewProgress("审查完成！");
+      setReviewStep("completed");
+
       toast({
-        title: "网络错误",
-        description: "请检查网络连接",
+        title: "审查完成",
+        description: `AI 评分: ${generateData.report?.aiScore || '--'} 分`,
+      });
+
+      // 3秒后跳转到报告详情
+      setTimeout(() => {
+        router.push(`/reports/${newReportId}`);
+      }, 2000);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "审查过程中发生错误");
+      setReviewStep("error");
+      toast({
+        title: "审查失败",
+        description: err instanceof Error ? err.message : "请重试",
         variant: "destructive",
       });
-    } finally {
-      setIsCreating(false);
     }
   }
 
@@ -116,7 +170,7 @@ export default function NewReportPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       {/* 头部 */}
       <div>
         <Button
@@ -129,95 +183,205 @@ export default function NewReportPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回项目详情
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight">创建审查任务</h2>
+        <h2 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <Bot className="h-8 w-8 text-primary" />
+          AI 智能审查
+        </h2>
         <p className="text-muted-foreground">
-          选择已解析完成的文档进行合规性审查
+          选择投标文件，AI 将自动进行合规性审查分析
         </p>
       </div>
 
-      {/* 文档选择 */}
+      {/* Agent 信息 */}
+      {agentInfo && (
+        <Card className="border-primary/20">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bot className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="font-medium">{agentInfo.agent?.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    多智能体协作审查系统
+                  </p>
+                </div>
+              </div>
+              <Badge className="bg-green-500">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                已就绪
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 审查流程 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 text-primary" />
-            选择审查文档
+            <ClipboardCheck className="h-5 w-5" />
+            审查流程
           </CardTitle>
           <CardDescription>
-            仅显示已解析完成的文档，请选择要进行合规性审查的文档
+            {reviewStep === "select" && "选择要审查的投标文件"}
+            {reviewStep === "creating" && "正在创建审查任务..."}
+            {reviewStep === "analyzing" && "AI 正在进行智能分析..."}
+            {reviewStep === "completed" && "审查已完成，即将跳转到报告详情"}
+            {reviewStep === "error" && "审查过程出现问题"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {documents.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
-                暂无已解析的文档，请先上传并解析文档
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/projects/${projectId}/documents/upload`)}
-              >
-                前往上传文档
-              </Button>
-            </div>
-          ) : (
+          {/* 步骤1: 选择文档 */}
+          {reviewStep === "select" && (
             <>
-              <div className="grid gap-3">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      selectedDoc === doc.id
-                        ? "border-primary bg-primary/5"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                    onClick={() => setSelectedDoc(doc.id)}
+              {documents.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    暂无已解析的文档，请先上传并解析投标文件
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/projects/${projectId}/documents/upload`)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="font-medium">{doc.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {getDocTypeLabel(doc.docType)} ·
-                            上传于 {new Date(doc.createdAt).toLocaleDateString("zh-CN")}
-                          </p>
+                    前往上传文档
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* 优先显示投标文件 */}
+                  <div className="space-y-2 mb-4">
+                    <p className="text-sm font-medium">投标文件（推荐）</p>
+                    {documents.filter(d => d.docType === "bid_doc").map((doc) => (
+                      <div
+                        key={doc.id}
+                        className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                          selectedDoc === doc.id
+                            ? "border-primary bg-primary/5 ring-2 ring-primary"
+                            : "border-gray-200 hover:border-primary/50"
+                        }`}
+                        onClick={() => setSelectedDoc(doc.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-primary" />
+                            <div>
+                              <p className="font-medium">{doc.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                投标文件 · 上传于 {new Date(doc.createdAt).toLocaleDateString("zh-CN")}
+                              </p>
+                            </div>
+                          </div>
+                          {selectedDoc === doc.id && (
+                            <Badge className="bg-primary">已选择</Badge>
+                          )}
                         </div>
                       </div>
-                      {selectedDoc === doc.id && (
-                        <Badge className="bg-primary">已选择</Badge>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
+
+                  {/* 其他文件 */}
+                  {documents.filter(d => d.docType !== "bid_doc").length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm font-medium text-muted-foreground">其他文件</p>
+                      {documents.filter(d => d.docType !== "bid_doc").map((doc) => (
+                        <div
+                          key={doc.id}
+                          className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                            selectedDoc === doc.id
+                              ? "border-primary bg-primary/5"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                          onClick={() => setSelectedDoc(doc.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm">{doc.name}</p>
+                            <Badge variant="outline">{getDocTypeLabel(doc.docType)}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-4 pt-4">
+                    <Button
+                      onClick={handleStartReview}
+                      disabled={!selectedDoc}
+                      size="lg"
+                    >
+                      <Bot className="mr-2 h-4 w-4" />
+                      开始 AI 审查
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/projects/${projectId}`)}
+                    >
+                      取消
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* 步骤2/3: 审查过程 */}
+          {(reviewStep === "creating" || reviewStep === "analyzing") && (
+            <div className="py-8 space-y-4">
+              <div className="flex items-center justify-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              </div>
+              <div className="text-center">
+                <p className="font-medium">{reviewProgress}</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {reviewStep === "creating" && "准备审查环境..."}
+                  {reviewStep === "analyzing" && "使用深度思考能力分析文档合规性..."}
+                </p>
               </div>
 
-              <div className="flex gap-4">
-                <Button
-                  onClick={handleCreateReport}
-                  disabled={isCreating || !selectedDoc}
-                >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      创建中...
-                    </>
-                  ) : (
-                    <>
-                      <ClipboardCheck className="mr-2 h-4 w-4" />
-                      开始审查
-                    </>
-                  )}
+              {/* 进度指示器 */}
+              <div className="flex justify-center gap-2 mt-6">
+                <div className={`w-3 h-3 rounded-full ${reviewStep === "creating" ? "bg-primary" : "bg-primary/30"}`} />
+                <div className={`w-3 h-3 rounded-full ${reviewStep === "analyzing" ? "bg-primary animate-pulse" : "bg-primary/30"}`} />
+                <div className="w-3 h-3 rounded-full bg-primary/30" />
+              </div>
+            </div>
+          )}
+
+          {/* 步骤4: 完成 */}
+          {reviewStep === "completed" && (
+            <div className="py-8 space-y-4">
+              <div className="flex items-center justify-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-medium text-green-600">审查完成！</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  正在跳转到报告详情...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 错误状态 */}
+          {reviewStep === "error" && (
+            <div className="py-8 space-y-4">
+              <div className="flex items-center justify-center">
+                <AlertCircle className="h-12 w-12 text-destructive" />
+              </div>
+              <div className="text-center">
+                <p className="font-medium text-destructive">审查失败</p>
+                <p className="text-sm text-muted-foreground mt-2">{error}</p>
+              </div>
+              <div className="flex justify-center gap-4">
+                <Button variant="outline" onClick={() => setReviewStep("select")}>
+                  重试
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/projects/${projectId}`)}
-                  disabled={isCreating}
-                >
-                  取消
+                <Button variant="outline" onClick={() => router.push(`/projects/${projectId}`)}>
+                  返回
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

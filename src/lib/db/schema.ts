@@ -313,7 +313,9 @@ export const reviewIssues = pgTable("review_issues", {
   reportId: uuid("report_id")
     .notNull()
     .references(() => reviewReports.id, { onDelete: "cascade" }),
-  blockId: uuid("block_id").references(() => documentBlocks.id), // 关联区块
+  blockId: uuid("block_id").references(() => documentBlocks.id, { onDelete: "set null" }), // 删除block时设为null，保留问题记录
+  checkpointId: varchar("checkpoint_id", { length: 100 }), // 关联检查点ID
+  agentSource: varchar("agent_source", { length: 100 }), // 发现问题的智能体来源
   // 问题信息
   category: varchar("category", { length: 100 }).notNull(),       // 问题类别
   severity: issueSeverityEnum("severity").notNull(),

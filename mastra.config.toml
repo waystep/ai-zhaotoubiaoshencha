@@ -1,0 +1,14 @@
+# Mastra 配置文件
+# 用于 Mastra Studio 和 CLI 工具
+
+# Mastra 实例路径
+mastraDir = "src/mastra"
+
+# 输出目录
+outputDir = ".mastra/output"
+
+# 日志级别
+loggerLevel = "info"
+
+# 服务端口（Mastra Studio）
+port = 4111
