@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, MapPin, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,8 @@ interface IssueLocationViewerProps {
   onIssueClick?: (issue: ReviewIssue) => void;
   onIssueHover?: (issue: ReviewIssue | null) => void;
   selectedIssueId?: string;
+  hoveredIssueId?: string;
+  issueNoById?: Record<string, number>;
 }
 
 const severityColors = {
@@ -58,11 +60,14 @@ export function IssueLocationViewer({
   onIssueClick,
   onIssueHover,
   selectedIssueId,
+  hoveredIssueId,
+  issueNoById,
 }: IssueLocationViewerProps) {
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
   const [scope, setScope] = useState<"follow" | "all">("follow");
   const [severity, setSeverity] = useState<"all" | ReviewIssue["severity"]>("all");
   const [resolved, setResolved] = useState<"all" | "resolved" | "unresolved">("all");
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   function toggleIssue(issueId: string) {
     setExpandedIssues((prev) => {
@@ -90,6 +95,50 @@ export function IssueLocationViewer({
     }
     return list;
   }, [issues, scope, currentPage, severity, resolved]);
+
+  const hoveredIssue = useMemo(() => {
+    if (!hoveredIssueId) return null;
+    return issues.find((i) => i.id === hoveredIssueId) ?? null;
+  }, [hoveredIssueId, issues]);
+
+  const hoveredVisible = useMemo(() => {
+    if (!hoveredIssueId) return false;
+    return filteredIssues.some((i) => i.id === hoveredIssueId);
+  }, [hoveredIssueId, filteredIssues]);
+
+  // soft-expand hovered item when it is in the current filtered list
+  useEffect(() => {
+    if (!hoveredIssueId) return;
+    if (!hoveredVisible) return;
+    setExpandedIssues((prev) => {
+      if (prev.has(hoveredIssueId)) return prev;
+      const next = new Set(prev);
+      next.add(hoveredIssueId);
+      return next;
+    });
+  }, [hoveredIssueId, hoveredVisible]);
+
+  function revealIssueInList(issueId: string) {
+    // if current filters exclude it, switch to all first
+    if (!filteredIssues.some((i) => i.id === issueId)) {
+      setScope("all");
+      setSeverity("all");
+      setResolved("all");
+      requestAnimationFrame(() => revealIssueInList(issueId));
+      return;
+    }
+
+    setExpandedIssues((prev) => {
+      const next = new Set(prev);
+      next.add(issueId);
+      return next;
+    });
+
+    requestAnimationFrame(() => {
+      const el = itemRefs.current.get(issueId);
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }
 
   // 按严重程度分组
   const groupedIssues = useMemo(() => {
@@ -177,6 +226,19 @@ export function IssueLocationViewer({
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {hoveredIssue && !hoveredVisible && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/20 p-2 text-xs">
+              <div className="min-w-0 text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  #{issueNoById?.[hoveredIssue.id] ?? "-"} {hoveredIssue.title}
+                </span>{" "}
+                · 第 {hoveredIssue.location.pageNumber} 页
+              </div>
+              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => revealIssueInList(hoveredIssue.id)}>
+                在列表中定位
+              </Button>
+            </div>
+          )}
           {filteredIssues.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
               {scope === "follow" && currentPage ? "当前页未发现问题" : "暂无数据"}
@@ -186,10 +248,19 @@ export function IssueLocationViewer({
               {filteredIssues.map((issue) => (
                 <div
                   key={issue.id}
+                  ref={(el) => {
+                    if (!el) {
+                      itemRefs.current.delete(issue.id);
+                      return;
+                    }
+                    itemRefs.current.set(issue.id, el);
+                  }}
                   className={`rounded-lg border cursor-pointer transition-all ${
                     selectedIssueId === issue.id
                       ? "border-primary ring-2 ring-primary/20"
-                      : "border-transparent hover:border-gray-200"
+                      : hoveredIssueId === issue.id
+                        ? "border-primary/60 ring-2 ring-primary/10"
+                        : "border-transparent hover:border-gray-200"
                   } ${severityColors[issue.severity]}`}
                   onClick={() => onIssueClick?.(issue)}
                   onMouseEnter={() => onIssueHover?.(issue)}
@@ -204,6 +275,9 @@ export function IssueLocationViewer({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border bg-background px-1 text-xs font-semibold tabular-nums">
+                          {issueNoById?.[issue.id] ?? ""}
+                        </span>
                         <Badge className={severityColors[issue.severity]}>
                           {severityLabels[issue.severity]}
                         </Badge>

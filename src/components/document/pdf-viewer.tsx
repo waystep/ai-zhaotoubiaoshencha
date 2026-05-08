@@ -46,6 +46,10 @@ interface PdfViewerProps {
   focusedIssue?: IssueLocation | null;
   /** 仅用于 hover 联动：不触发滚动，仅改变高亮样式 */
   hoveredIssue?: IssueLocation | null;
+  /** PDF 标识 hover 回调（用于反向联动问题列表） */
+  onIssueHover?: (issue: IssueLocation | null) => void;
+  /** 用于显示统一编号（key = `${pageNumber}-${blockIndex}`） */
+  issueNoByKey?: Record<string, number>;
   /**
    * 当本次 focusedIssue 触发的“定位滚动”执行后回调（用于一次性定位：定位完成即清理 focusedIssue，避免滚动回弹）
    */
@@ -95,10 +99,13 @@ export function PdfViewer({
   highlightedIssues = [],
   focusedIssue,
   hoveredIssue,
+  onIssueHover,
+  issueNoByKey,
   onFocusedIssueConsumed,
   currentPage,
   onPageChange,
 }: PdfViewerProps) {
+  const issueKey = useCallback((loc: IssueLocation) => `${loc.pageNumber}-${loc.blockIndex}`, []);
   const fileUrl = useMemo(() => `/api/documents/${documentId}/file`, [documentId]);
   const documentOptions = useMemo(() => ({ withCredentials: true as const }), []);
 
@@ -459,37 +466,75 @@ export function PdfViewer({
     );
 
     return (
-      <div
-        className="pointer-events-none absolute left-0 top-0"
-        style={{ width: overlaySize.w, height: overlaySize.h }}
-      >
-        {allIssues.map((issue, idx) => {
-          const box = boxForIssue(issue, pageBlocks);
-          if (!box) return null;
-          const { left, top, width, height } = mapBoxToOverlay(
-            box,
-            refW,
-            refH,
-            overlaySize.w,
-            overlaySize.h
-          );
-          const focused = isFocused(issue);
-          const hovered = !focused && isHovered(issue);
-          return (
-            <div
-              key={`${pageNum}-${issue.blockIndex}-${idx}`}
-              className={
-                focused
-                  ? "pointer-events-none absolute rounded-sm border-2 border-orange-500 bg-orange-400/30 shadow-[0_0_0_2px_rgba(249,115,22,0.4)]"
-                  : hovered
-                    ? "pointer-events-none absolute rounded-sm border-2 border-primary bg-primary/15 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]"
-                  : "pointer-events-none absolute rounded-sm border-2 border-yellow-500 bg-yellow-300/20"
-              }
-              style={{ left, top, width, height }}
-            />
-          );
-        })}
-      </div>
+      <>
+        {/* 视觉层：完全不接收事件 */}
+        <div
+          className="pointer-events-none absolute left-0 top-0 z-10"
+          style={{ width: overlaySize.w, height: overlaySize.h }}
+        >
+          {allIssues.map((issue, idx) => {
+            const box = boxForIssue(issue, pageBlocks);
+            if (!box) return null;
+            const { left, top, width, height } = mapBoxToOverlay(
+              box,
+              refW,
+              refH,
+              overlaySize.w,
+              overlaySize.h
+            );
+            const focused = isFocused(issue);
+            const hovered = !focused && isHovered(issue);
+            const no = issueNoByKey?.[issueKey(issue)];
+            return (
+              <div
+                key={`v-${pageNum}-${issue.blockIndex}-${idx}`}
+                className={
+                  focused
+                    ? "pointer-events-none absolute rounded-sm border-2 border-orange-500 bg-orange-400/30 shadow-[0_0_0_2px_rgba(249,115,22,0.4)]"
+                    : hovered
+                      ? "pointer-events-none absolute rounded-sm border-2 border-primary bg-primary/15 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]"
+                      : "pointer-events-none absolute rounded-sm border-2 border-yellow-500 bg-yellow-300/20"
+                }
+                style={{ left, top, width, height }}
+              >
+                {no != null && (
+                  <div className="absolute -left-2 -top-2 rounded-md border bg-background px-1 text-[10px] font-semibold text-foreground shadow-sm tabular-nums">
+                    {no}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 命中层：只负责 hover 联动，不影响视觉（透明） */}
+        <div
+          className="absolute left-0 top-0 z-20"
+          style={{ width: overlaySize.w, height: overlaySize.h }}
+        >
+          {allIssues.map((issue, idx) => {
+            const box = boxForIssue(issue, pageBlocks);
+            if (!box) return null;
+            const { left, top, width, height } = mapBoxToOverlay(
+              box,
+              refW,
+              refH,
+              overlaySize.w,
+              overlaySize.h
+            );
+            return (
+              <div
+                key={`h-${pageNum}-${issue.blockIndex}-${idx}`}
+                className="absolute"
+                style={{ left, top, width, height }}
+                onMouseEnter={() => onIssueHover?.(issue)}
+                onMouseLeave={() => onIssueHover?.(null)}
+                title="悬停查看对应问题"
+              />
+            );
+          })}
+        </div>
+      </>
     );
   }
 

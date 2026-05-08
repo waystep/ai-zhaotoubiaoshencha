@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ClipboardCheck,
@@ -18,7 +18,6 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { IssueLocationViewer } from "@/components/review/issue-location-viewer";
@@ -109,7 +108,7 @@ export default function ReportDetailPage() {
   // 一次性触发 PdfViewer 定位滚动：滚动完成后会自动清理，避免“滚动回弹”
   const [focusedIssueOnce, setFocusedIssueOnce] = useState<Issue["location"] | null>(null);
   const [hoveredIssue, setHoveredIssue] = useState<Issue["location"] | null>(null);
-  const [activeTab, setActiveTab] = useState("location");
+  const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -196,9 +195,34 @@ export default function ReportDetailPage() {
     setFocusedIssueOnce(issue.location);
   }
 
+  const issueNoById = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (let i = 0; i < (report?.issues?.length ?? 0); i++) {
+      const it = report!.issues[i];
+      map[it.id] = i + 1;
+    }
+    return map;
+  }, [report?.issues]);
+
+  const issueNoByKey = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (let i = 0; i < (report?.issues?.length ?? 0); i++) {
+      const it = report!.issues[i];
+      map[`${it.location.pageNumber}-${it.location.blockIndex}`] = i + 1;
+    }
+    return map;
+  }, [report?.issues]);
+
+  const issueIdByKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const it of report?.issues ?? []) {
+      map[`${it.location.pageNumber}-${it.location.blockIndex}`] = it.id;
+    }
+    return map;
+  }, [report?.issues]);
+
   function handleLocateClick(issue: Issue) {
     selectIssue(issue);
-    setActiveTab("location");
   }
 
   function handlePageChange(pageNumber: number) {
@@ -379,55 +403,57 @@ export default function ReportDetailPage() {
         </Card>
       )}
 
-      {/* 问题清单和文档预览 */}
+      {/* 问题定位工作台（合并版） */}
       {report.status === "completed" && report.issues && report.issues.length > 0 && (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="location" className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              问题定位
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="location">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <IssueLocationViewer
-                issues={report.issues}
-                currentPage={currentPage}
-                onIssueClick={handleLocateClick}
-                onIssueHover={(issue) => setHoveredIssue(issue?.location ?? null)}
-                selectedIssueId={selectedIssueId}
-              />
-              <Card className="shadow-sm bg-muted/20">
-                <CardHeader>
-                  <CardTitle>当前页预览</CardTitle>
-                  <CardDescription>
-                    第 {currentPage} 页内容
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {blocks.length > 0 ? (
-                    <PdfViewer
-                      documentId={report.document.id}
-                      blocks={blocks}
-                      // 在“问题定位”中保留全量高亮，避免仅当前页导致定位/对比信息缺失
-                      highlightedIssues={report.issues.map((i) => i.location)}
-                      focusedIssue={focusedIssueOnce}
-                      hoveredIssue={hoveredIssue}
-                      onFocusedIssueConsumed={() => setFocusedIssueOnce(null)}
-                      currentPage={currentPage}
-                      onPageChange={handlePageChange}
-                    />
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      加载中...
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4" />
+            选择问题定位到 PDF；滚动 PDF 时默认按当前页筛选。
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <IssueLocationViewer
+              issues={report.issues}
+              currentPage={currentPage}
+              onIssueClick={handleLocateClick}
+              onIssueHover={(issue) => {
+                setHoveredIssue(issue?.location ?? null);
+                setHoveredIssueId(issue?.id ?? null);
+              }}
+              selectedIssueId={selectedIssueId}
+              hoveredIssueId={hoveredIssueId ?? undefined}
+              issueNoById={issueNoById}
+            />
+            <Card className="shadow-sm bg-muted/20">
+              <CardHeader>
+                <CardTitle>当前页预览</CardTitle>
+                <CardDescription>第 {currentPage} 页内容</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {blocks.length > 0 ? (
+                  <PdfViewer
+                    documentId={report.document.id}
+                    blocks={blocks}
+                    // 保留全量高亮：便于对照（仅左侧列表可切“当前页/全部”）
+                    highlightedIssues={report.issues.map((i) => i.location)}
+                    focusedIssue={focusedIssueOnce}
+                    hoveredIssue={hoveredIssue}
+                    issueNoByKey={issueNoByKey}
+                    onIssueHover={(loc) => {
+                      setHoveredIssue(loc);
+                      const id = loc ? issueIdByKey[`${loc.pageNumber}-${loc.blockIndex}`] : null;
+                      setHoveredIssueId(id ?? null);
+                    }}
+                    onFocusedIssueConsumed={() => setFocusedIssueOnce(null)}
+                    currentPage={currentPage}
+                    onPageChange={handlePageChange}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">加载中...</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       {/* 空状态 */}
