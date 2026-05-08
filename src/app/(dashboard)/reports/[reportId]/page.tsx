@@ -348,7 +348,7 @@ export default function ReportDetailPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold truncate">
+            <div className="text-lg font-semibold truncate" title={report.document.name}>
               {report.document.name}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -451,7 +451,7 @@ export default function ReportDetailPage() {
                             onClick={() => handleLocateClick(issue)}
                           >
                             <Eye className="h-3 w-3" />
-                            定位预览
+                            定位
                           </Button>
                         </div>
                       </div>
