@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPin, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface IssueLocation {
   pageNumber: number;
@@ -161,6 +162,19 @@ export function IssueLocationViewer({
                         <span className="text-xs">
                           第 {issue.location.pageNumber} 页
                         </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onIssueClick?.(issue);
+                          }}
+                          title="定位到 PDF 对应位置"
+                        >
+                          <Eye className="h-3 w-3" />
+                          定位
+                        </Button>
                         {expandedIssues.has(issue.id) ? (
                           <ChevronUp className="h-4 w-4" />
                         ) : (

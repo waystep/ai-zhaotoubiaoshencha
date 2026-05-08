@@ -106,6 +106,8 @@ export default function ReportDetailPage() {
   const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIssueId, setSelectedIssueId] = useState<string | undefined>();
+  // 一次性触发 PdfViewer 定位滚动：滚动完成后会自动清理，避免“滚动回弹”
+  const [focusedIssueOnce, setFocusedIssueOnce] = useState<Issue["location"] | null>(null);
   const [activeTab, setActiveTab] = useState("issues");
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -190,6 +192,7 @@ export default function ReportDetailPage() {
   function selectIssue(issue: Issue) {
     setSelectedIssueId(issue.id);
     setCurrentPage(issue.location.pageNumber);
+    setFocusedIssueOnce(issue.location);
   }
 
   function handleLocateClick(issue: Issue) {
@@ -472,11 +475,8 @@ export default function ReportDetailPage() {
                   documentId={report.document.id}
                   blocks={blocks}
                   highlightedIssues={report.issues.map((i) => i.location)}
-                  focusedIssue={
-                    selectedIssueId
-                      ? report.issues.find((i) => i.id === selectedIssueId)?.location
-                      : undefined
-                  }
+                  focusedIssue={focusedIssueOnce}
+                  onFocusedIssueConsumed={() => setFocusedIssueOnce(null)}
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
                 />
@@ -506,11 +506,8 @@ export default function ReportDetailPage() {
                       blocks={blocks}
                       // 在“问题定位”中保留全量高亮，避免仅当前页导致定位/对比信息缺失
                       highlightedIssues={report.issues.map((i) => i.location)}
-                      focusedIssue={
-                        selectedIssueId
-                          ? report.issues.find((i) => i.id === selectedIssueId)?.location
-                          : undefined
-                      }
+                      focusedIssue={focusedIssueOnce}
+                      onFocusedIssueConsumed={() => setFocusedIssueOnce(null)}
                       currentPage={currentPage}
                       onPageChange={handlePageChange}
                     />

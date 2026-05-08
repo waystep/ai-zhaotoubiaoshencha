@@ -44,6 +44,10 @@ interface PdfViewerProps {
   highlightedIssues?: IssueLocation[];
   /** 当前被选中/聚焦的问题，在 PDF 上用醒目样式区分 */
   focusedIssue?: IssueLocation | null;
+  /**
+   * 当本次 focusedIssue 触发的“定位滚动”执行后回调（用于一次性定位：定位完成即清理 focusedIssue，避免滚动回弹）
+   */
+  onFocusedIssueConsumed?: () => void;
   currentPage?: number;
   onPageChange?: (pageNumber: number) => void;
 }
@@ -88,6 +92,7 @@ export function PdfViewer({
   blocks = [],
   highlightedIssues = [],
   focusedIssue,
+  onFocusedIssueConsumed,
   currentPage,
   onPageChange,
 }: PdfViewerProps) {
@@ -394,8 +399,17 @@ export function PdfViewer({
     const raf = requestAnimationFrame(() => {
       scrollToIssue({ ...focusedIssue, pageNumber: target });
     });
-    return () => cancelAnimationFrame(raf);
-  }, [focusedIssue, pdfReady, numPages, scrollToIssue]);
+
+    // 700ms 是 progScrollTargetRef 的保护窗口，这里稍微延后一点，确保“定位滚动”已触发
+    const t = window.setTimeout(() => {
+      onFocusedIssueConsumed?.();
+    }, 800);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+    };
+  }, [focusedIssue, pdfReady, numPages, onFocusedIssueConsumed, scrollToIssue]);
 
   function isFocused(issue: IssueLocation): boolean {
     if (!focusedIssue) return false;
