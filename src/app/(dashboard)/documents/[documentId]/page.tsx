@@ -45,19 +45,6 @@ function parseProgressPercent(p: number | null | undefined): number {
   return Math.min(100, Math.max(0, Math.round(p)));
 }
 
-interface IssueLocation {
-  pageNumber: number;
-  blockIndex: number;
-  bbox?: {
-    x0: number;
-    y0: number;
-    x1: number;
-    y1: number;
-  };
-  textSnippet?: string;
-  highlightText?: string;
-}
-
 export default function DocumentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -324,7 +311,7 @@ export default function DocumentDetailPage() {
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">文档尚未解析</h3>
             <p className="text-muted-foreground text-center mb-4">
-              点击上方"开始解析"按钮，使用 MinerU 解析文档内容
+              点击上方「开始解析」按钮，使用 MinerU 解析文档内容
             </p>
           </CardContent>
         </Card>

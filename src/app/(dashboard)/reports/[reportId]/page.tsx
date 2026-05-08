@@ -421,7 +421,7 @@ export default function ReportDetailPage() {
                           <p className="text-sm mb-2">{issue.description}</p>
                           {issue.location.textSnippet && (
                             <div className="bg-white/50 p-2 rounded text-sm font-mono mb-2">
-                              "{issue.location.textSnippet}"
+                              「{issue.location.textSnippet}」
                             </div>
                           )}
                           {issue.suggestion && (
@@ -487,11 +487,12 @@ export default function ReportDetailPage() {
                   {blocks.length > 0 ? (
                     <PdfViewer
                       documentId={report.document.id}
-                      blocks={blocks.filter((b) => b.pageNumber === currentPage)}
+                      blocks={blocks}
                       highlightedIssues={report.issues
                         .filter((i) => i.location.pageNumber === currentPage)
                         .map((i) => i.location)}
                       currentPage={currentPage}
+                      onPageChange={handlePageChange}
                     />
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
@@ -525,7 +526,7 @@ export default function ReportDetailPage() {
             <Clock className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">尚未开始审查</h3>
             <p className="text-muted-foreground text-center mb-4">
-              点击上方"开始审查"按钮，AI 将自动分析文档内容
+              点击上方「开始审查」按钮，AI 将自动分析文档内容
             </p>
           </CardContent>
         </Card>

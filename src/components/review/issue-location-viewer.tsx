@@ -175,7 +175,7 @@ export function IssueLocationViewer({
 
                         {issue.location.textSnippet && (
                           <div className="bg-white/50 p-2 rounded text-sm font-mono">
-                            "{issue.location.textSnippet}"
+                            「{issue.location.textSnippet}」
                             {issue.location.highlightText && (
                               <mark className="bg-yellow-300 px-1 rounded ml-1">
                                 {issue.location.highlightText}

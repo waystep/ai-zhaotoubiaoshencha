@@ -76,7 +76,7 @@ export default function DocumentDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isParsing, setIsParsing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [pollInterval, setPollInterval] = useState<number | null>(null);
+  const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   // 使用 ref 防止 StrictMode 下重复调用
   const hasFetchedRef = useRef(false);
@@ -583,7 +583,7 @@ export default function DocumentDetailPage() {
             <Clock className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">文档待解析</h3>
             <p className="text-muted-foreground text-center mb-4">
-              点击上方"开始解析"按钮，调用 MinerU 解析文档内容
+              点击上方「开始解析」按钮，调用 MinerU 解析文档内容
             </p>
             <Button onClick={handleParse} disabled={isParsing}>
               {isParsing ? (

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-interface IssueLocation {
+import "react-pdf/dist/Page/TextLayer.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+export interface IssueLocation {
   pageNumber: number;
   blockIndex: number;
   bbox?: {
@@ -18,7 +24,7 @@ interface IssueLocation {
   highlightText?: string;
 }
 
-interface DocumentBlock {
+export interface DocumentBlock {
   id: string;
   pageNumber: number;
   blockIndex: number;
@@ -40,6 +46,43 @@ interface PdfViewerProps {
   onPageChange?: (pageNumber: number) => void;
 }
 
+function inferRefDimensions(
+  boxes: Array<{ x0: number; y0: number; x1: number; y1: number }>,
+  fallbackW: number,
+  fallbackH: number
+): { refW: number; refH: number } {
+  let refW = Math.max(fallbackW, 1);
+  let refH = Math.max(fallbackH, 1);
+  for (const b of boxes) {
+    refW = Math.max(refW, b.x1, b.x0);
+    refH = Math.max(refH, b.y1, b.y0);
+  }
+  return { refW, refH };
+}
+
+function mapBoxToOverlay(
+  box: { x0: number; y0: number; x1: number; y1: number },
+  refW: number,
+  refH: number,
+  overlayW: number,
+  overlayH: number
+) {
+  const left = (box.x0 / refW) * overlayW;
+  const top = (box.y0 / refH) * overlayH;
+  const width = ((box.x1 - box.x0) / refW) * overlayW;
+  const height = ((box.y1 - box.y0) / refH) * overlayH;
+  return { left, top, width: Math.max(width, 1), height: Math.max(height, 1) };
+}
+
+function boxForIssue(issue: IssueLocation, pageBlocks: DocumentBlock[]) {
+  const b = issue.bbox;
+  if (b && b.x1 > b.x0 && b.y1 > b.y0) {
+    return b;
+  }
+  const block = pageBlocks.find((x) => x.blockIndex === issue.blockIndex);
+  return block?.bbox ?? null;
+}
+
 export function PdfViewer({
   documentId,
   blocks = [],
@@ -47,137 +90,151 @@ export function PdfViewer({
   currentPage,
   onPageChange,
 }: PdfViewerProps) {
-  const [activePage, setActivePage] = useState(currentPage || 1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [scale, setScale] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pageContent, setPageContent] = useState<DocumentBlock[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const fileUrl = useMemo(() => `/api/documents/${documentId}/file`, [documentId]);
+  const documentOptions = useMemo(() => ({ withCredentials: true as const }), []);
 
-  // Sync with external currentPage prop
+  const [numPages, setNumPages] = useState(0);
+  const [activePage, setActivePage] = useState(() => Math.max(1, currentPage ?? 1));
+  const [zoom, setZoom] = useState(1);
+  const [containerWidth, setContainerWidth] = useState(720);
+  const [layout, setLayout] = useState<{
+    overlayW: number;
+    overlayH: number;
+    baseW: number;
+    baseH: number;
+  } | null>(null);
+  const [pdfReady, setPdfReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const pageWidth = Math.round(Math.max(240, containerWidth * zoom));
+
+  const pageBlocks = useMemo(
+    () => blocks.filter((b) => b.pageNumber === activePage),
+    [blocks, activePage]
+  );
+
   useEffect(() => {
-    if (currentPage && currentPage !== activePage) {
-      setActivePage(currentPage);
-      updatePageContent(currentPage);
-    }
-  }, [currentPage]);
+    setNumPages(0);
+    setPdfReady(false);
+    setLoadError(null);
+    setLayout(null);
+    setActivePage(Math.max(1, currentPage ?? 1));
+  }, [documentId]);
 
   useEffect(() => {
-    if (blocks.length > 0) {
-      const maxPage = Math.max(...blocks.map((b) => b.pageNumber));
-      setTotalPages(maxPage);
-      updatePageContent(activePage);
-      setIsLoading(false);
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setContainerWidth(Math.max(240, Math.floor(el.clientWidth - 16)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (currentPage == null || currentPage < 1) return;
+    if (numPages > 0 && currentPage > numPages) {
+      setActivePage(numPages);
+      onPageChange?.(numPages);
+      return;
     }
-  }, [blocks]);
+    setActivePage((p) => (p === currentPage ? p : currentPage));
+  }, [currentPage, numPages]);
 
-  function updatePageContent(pageNumber: number) {
-    const pageBlocks = blocks.filter((b) => b.pageNumber === pageNumber);
-    setPageContent(pageBlocks);
-  }
+  useEffect(() => {
+    if (numPages <= 0) return;
+    setActivePage((p) => (p > numPages ? numPages : p < 1 ? 1 : p));
+  }, [numPages]);
 
-  function handlePreviousPage() {
-    if (activePage > 1) {
-      const newPage = activePage - 1;
-      setActivePage(newPage);
-      updatePageContent(newPage);
-      onPageChange?.(newPage);
-    }
-  }
+  const onDocumentLoadSuccess = useCallback(({ numPages: n }: { numPages: number }) => {
+    setNumPages(n);
+    setPdfReady(true);
+    setLoadError(null);
+  }, []);
 
-  function handleNextPage() {
-    if (activePage < totalPages) {
-      const newPage = activePage + 1;
-      setActivePage(newPage);
-      updatePageContent(newPage);
-      onPageChange?.(newPage);
-    }
-  }
+  const onDocumentLoadError = useCallback((err: Error) => {
+    console.error("[PdfViewer] 文档加载失败:", err);
+    setLoadError(err?.message || "无法加载 PDF");
+    setPdfReady(true);
+  }, []);
 
-  function handleZoomIn() {
-    setScale(Math.min(scale + 0.25, 2));
-  }
+  const handlePageRenderSuccess = useCallback(
+    (page: { getViewport: (opts: { scale: number }) => { width: number; height: number } }) => {
+      const base = page.getViewport({ scale: 1 });
+      const scale = pageWidth / base.width;
+      const vp = page.getViewport({ scale });
+      setLayout({
+        overlayW: vp.width,
+        overlayH: vp.height,
+        baseW: base.width,
+        baseH: base.height,
+      });
+    },
+    [pageWidth]
+  );
 
-  function handleZoomOut() {
-    setScale(Math.max(scale - 0.25, 0.5));
-  }
+  const goPrev = () => {
+    setActivePage((p) => {
+      const next = Math.max(1, p - 1);
+      if (next !== p) onPageChange?.(next);
+      return next;
+    });
+  };
 
-  // 检查区块是否被高亮
-  function isBlockHighlighted(block: DocumentBlock): IssueLocation | null {
+  const goNext = () => {
+    setActivePage((p) => {
+      const next = numPages > 0 ? Math.min(numPages, p + 1) : p + 1;
+      if (next !== p) onPageChange?.(next);
+      return next;
+    });
+  };
+
+  const issueBoxes = useMemo(() => {
+    const list: Array<{ key: string; box: { x0: number; y0: number; x1: number; y1: number } }> = [];
     for (const issue of highlightedIssues) {
-      if (
-        issue.pageNumber === block.pageNumber &&
-        issue.blockIndex === block.blockIndex
-      ) {
-        return issue;
-      }
+      if (issue.pageNumber !== activePage) continue;
+      const box = boxForIssue(issue, pageBlocks);
+      if (!box) continue;
+      list.push({
+        key: `issue-${issue.pageNumber}-${issue.blockIndex}-${issue.textSnippet?.slice(0, 12) ?? ""}`,
+        box,
+      });
     }
-    return null;
-  }
+    return list;
+  }, [highlightedIssues, activePage, pageBlocks]);
 
-  // 渲染区块内容
-  function renderBlock(block: DocumentBlock) {
-    const highlight = isBlockHighlighted(block);
-    const baseClasses = "absolute p-2 transition-all duration-200";
-    const typeClasses = getTypeClasses(block.blockType);
-    const highlightClasses = highlight
-      ? "bg-yellow-100 border-2 border-yellow-500 shadow-md"
-      : "bg-white/80 border border-gray-200";
+  const highlightOverlay = useMemo(() => {
+    if (!layout) return null;
+    const boxesForRef = [
+      ...pageBlocks.map((b) => b.bbox),
+      ...issueBoxes.map((x) => x.box),
+    ];
+    const { refW, refH } = inferRefDimensions(boxesForRef, layout.baseW, layout.baseH);
 
-    const style = {
-      left: `${block.bbox.x0 * scale}px`,
-      top: `${block.bbox.y0 * scale}px`,
-      width: `${(block.bbox.x1 - block.bbox.x0) * scale}px`,
-      height: `${(block.bbox.y1 - block.bbox.y0) * scale}px`,
-    };
+    return issueBoxes.map(({ key, box }) => {
+      const { left, top, width, height } = mapBoxToOverlay(box, refW, refH, layout.overlayW, layout.overlayH);
+      return (
+        <div
+          key={key}
+          className="pointer-events-none absolute rounded-sm border-2 border-yellow-500 bg-yellow-300/20"
+          style={{ left, top, width, height }}
+        />
+      );
+    });
+  }, [layout, pageBlocks, issueBoxes]);
 
-    return (
-      <div
-        key={block.id}
-        className={`${baseClasses} ${typeClasses} ${highlightClasses}`}
-        style={style}
-        title={highlight?.textSnippet || undefined}
-      >
-        {highlight?.highlightText ? (
-          <span>
-            {block.content.split(highlight.highlightText).map((part, i, arr) => (
-              <>
-                {part}
-                {i < arr.length - 1 && (
-                  <mark className="bg-yellow-300 px-1 rounded">
-                    {highlight.highlightText}
-                  </mark>
-                )}
-              </>
-            ))}
-          </span>
-        ) : (
-          <span className="text-sm leading-relaxed">{block.content}</span>
-        )}
-      </div>
-    );
-  }
+  const totalPagesLabel = numPages > 0 ? numPages : Math.max(1, ...blocks.map((b) => b.pageNumber), 0);
 
-  function getTypeClasses(blockType: string | null): string {
-    switch (blockType) {
-      case "title":
-        return "text-lg font-bold";
-      case "heading":
-        return "text-base font-semibold";
-      case "paragraph":
-        return "text-sm";
-      case "table":
-        return "text-xs font-mono";
-      default:
-        return "text-sm";
-    }
-  }
-
-  if (isLoading) {
+  if (loadError) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <p className="text-sm text-destructive">{loadError}</p>
+          <p className="text-xs text-muted-foreground">
+            请确认源文件为 PDF；若为扫描件，解析区块叠层可能仍依赖 MinerU 坐标。
+          </p>
         </CardContent>
       </Card>
     );
@@ -185,76 +242,100 @@ export function PdfViewer({
 
   return (
     <div className="space-y-4">
-      {/* 控制栏 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePreviousPage}
-            disabled={activePage <= 1}
-          >
+          <Button variant="outline" size="sm" onClick={goPrev} disabled={activePage <= 1}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm">
-            第 {activePage} / {totalPages} 页
+          <span className="text-sm tabular-nums">
+            第 {activePage} / {totalPagesLabel} 页
           </span>
           <Button
             variant="outline"
             size="sm"
-            onClick={handleNextPage}
-            disabled={activePage >= totalPages}
+            onClick={goNext}
+            disabled={numPages === 0 || activePage >= numPages}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleZoomOut} disabled={scale <= 0.5}>
+          <Button variant="outline" size="sm" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))} disabled={zoom <= 0.5}>
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-sm w-12 text-center">{Math.round(scale * 100)}%</span>
-          <Button variant="outline" size="sm" onClick={handleZoomIn} disabled={scale >= 2}>
+          <span className="w-12 text-center text-sm tabular-nums">{Math.round(zoom * 100)}%</span>
+          <Button variant="outline" size="sm" onClick={() => setZoom((z) => Math.min(2, z + 0.25))} disabled={zoom >= 2}>
             <ZoomIn className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* 文档内容区域 */}
       <Card>
-        <CardContent className="p-4 overflow-auto">
-          <div
-            ref={containerRef}
-            className="relative bg-gray-50 min-h-[600px] rounded-lg overflow-hidden"
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-            }}
-          >
-            {/* 页面背景 */}
-            <div className="absolute inset-0 bg-white shadow-inner" style={{ width: "100%", height: "800px" }} />
-
-            {/* 渲染区块 */}
-            {pageContent.map((block) => renderBlock(block))}
+        <CardContent className="p-4">
+          <div ref={wrapRef} className="relative min-h-[480px] overflow-auto rounded-lg bg-muted/30">
+            {!pdfReady && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            <div className="relative mx-auto w-fit max-w-full py-2">
+              <Document
+                key={documentId}
+                file={fileUrl}
+                options={documentOptions}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                loading={null}
+                className="flex justify-center"
+              >
+                {numPages > 0 && (
+                  <div className="relative shadow-sm">
+                    <Page
+                      pageNumber={activePage}
+                      width={pageWidth}
+                      renderTextLayer
+                      renderAnnotationLayer={false}
+                      onRenderSuccess={handlePageRenderSuccess}
+                      loading={
+                        <div className="flex h-[520px] items-center justify-center text-sm text-muted-foreground">
+                          渲染页面…
+                        </div>
+                      }
+                    />
+                    {layout ? (
+                      <div
+                        className="pointer-events-none absolute left-0 top-0"
+                        style={{ width: layout.overlayW, height: layout.overlayH }}
+                      >
+                        {highlightOverlay}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </Document>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 当前页问题提示 */}
       {highlightedIssues.filter((i) => i.pageNumber === activePage).length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm font-semibold text-yellow-800 mb-2">
-            当前页发现 {highlightedIssues.filter((i) => i.pageNumber === activePage).length} 个问题
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-yellow-800">
+            当前页关联 {highlightedIssues.filter((i) => i.pageNumber === activePage).length} 条审查位置
           </p>
           <ul className="space-y-1">
             {highlightedIssues
               .filter((i) => i.pageNumber === activePage)
               .map((issue, index) => (
-                <li key={index} className="text-sm text-yellow-700">
-                  {issue.textSnippet && (
-                    <span className="font-mono bg-yellow-100 px-1 rounded">
-                      "{issue.textSnippet.substring(0, 50)}..."
+                <li key={`${issue.blockIndex}-${index}`} className="text-sm text-yellow-800">
+                  {issue.textSnippet ? (
+                    <span className="rounded bg-yellow-100 px-1 font-mono">
+                      「{issue.textSnippet.substring(0, 80)}
+                      {issue.textSnippet.length > 80 ? "…" : ""}」
                     </span>
+                  ) : (
+                    <span className="text-muted-foreground">（无摘要）</span>
                   )}
                 </li>
               ))}

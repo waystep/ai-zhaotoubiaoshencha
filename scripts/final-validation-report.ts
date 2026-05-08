@@ -63,7 +63,10 @@ async function finalValidationReport() {
 
   console.log('\n字段映射:');
   console.log(`  type: ${rawFirstBlock.type} → ${processedFirstBlock.type} ✓`);
-  console.log(`  bbox: [${rawFirstBlock.bbox.join(', ')}] → {x0:${processedFirstBlock.bbox.x0}, y0:${processedFirstBlock.bbox.y0}} ✓`);
+  const pb = processedFirstBlock.bbox;
+  console.log(
+    `  bbox: [${rawFirstBlock.bbox.join(", ")}] → {x0:${pb?.x0 ?? "?"}, y0:${pb?.y0 ?? "?"}} ✓`
+  );
 
   // 内容提取
   const rawContent = rawFirstBlock.lines[0].spans[0].content;

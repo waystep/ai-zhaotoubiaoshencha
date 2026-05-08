@@ -11,10 +11,15 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const orgId = session.user?.orgId;
+  if (!orgId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // 获取用户组织的所有项目
     const projects = await db.query.tenderProjects.findMany({
-      where: eq(tenderProjects.orgId, session.user?.orgId!),
+      where: eq(tenderProjects.orgId, orgId),
       columns: {
         id: true,
         name: true,
