@@ -4,6 +4,11 @@ import { Memory } from "@mastra/memory";
 import { reviewItemStorageTool } from "../tools/review-item-storage-tool";
 import { responseItemStorageTool } from "../tools/response-item-storage-tool";
 import { documentReaderTool } from "../tools/document-reader-tool";
+import {
+  extractionInstructions,
+  extractionWorkingMemoryTemplate,
+  reviewModelConfig,
+} from "../config/review";
 import { pgStore, pgVector } from "../storage";
 
 export const extractionAgent = new Agent({
@@ -49,31 +54,7 @@ export const extractionAgent = new Agent({
 - 如果不确定block ID，传递null即可，系统会根据location信息处理
 - 随机生成的block ID会导致数据库外键约束错误
 `,
-  instructions: `你是一位专业的文档提取专家，负责从招标文件和法律文件中提取结构化审查项和响应项。
-
-## 核心概念区分
-
-### 审查项（Review Items）
-**定义**：招标文件和法律文件中对投标的强制性要求条款，如不满足可能导致违规、违法或废标。
-
-**特点**：
-- 强制性要求，必须满足
-- 有明确的后果（废标、违规、违法、扣分等）
-- 用于后续审查投标文件是否合规
-- 包含法律依据和门槛值
-
-### 响应项（Response Items）
-**定义**：招标文件中要求投标人在投标文件中明确说明的内容，如使用的技术、人员资质等。
-
-**特点**：
-- 响应要求，需要投标方提供说明或证明
-- 用于评估投标文件的响应度
-- 可能影响评分，但不一定会导致废标
-- 包含响应格式和要求内容
-
-**关键区别**：审查项和响应项没有直接关联关系！
-- 审查项 → 用于合规审查
-- 响应项 → 用于响应度评估
+  instructions: `${extractionInstructions}
 
 ## 提取策略
 
@@ -246,7 +227,7 @@ export const extractionAgent = new Agent({
 
 根据实际内容命名，保持灵活性！
 `,
-  model: "alibaba-coding-plan-cn/qwen3.6-plus",
+  model: reviewModelConfig.defaultModel,
   memory: new Memory({
     storage: pgStore,
     vector: pgVector,
@@ -255,13 +236,7 @@ export const extractionAgent = new Agent({
       workingMemory: {
         enabled: true,
         scope: "resource",
-        template: `
-提取配置：
-- 提取模式：{{extractionMode}}
-- 文档类型：{{docType}}
-- 重点关注类型：{{focusTypes}}
-- 提取历史：{{extractionHistory}}
-`,
+        template: extractionWorkingMemoryTemplate,
       },
       generateTitle: true,
     },

@@ -4,7 +4,8 @@ import { z } from "zod";
 export type ReviewStatus =
   | "pending"
   | "in_progress"
-  | "completed";
+  | "completed"
+  | "failed";
 
 // 问题严重程度
 export type IssueSeverity =
@@ -18,6 +19,17 @@ export type Recommendation =
   | "pass"          // 通过
   | "fail"          // 不通过
   | "revise";       // 整改后通过
+
+export type ReviewItemResultStatus =
+  | "pass"
+  | "fail"
+  | "needs_manual_review";
+
+export type ResponseItemResultStatus =
+  | "answered"
+  | "partially_answered"
+  | "unanswered"
+  | "not_applicable";
 
 // 审查报告
 export interface ReviewReport {
@@ -53,6 +65,32 @@ export interface ReviewIssue {
   resolvedBy?: string;
   resolvedAt?: Date;
   createdAt: Date;
+}
+
+export interface ReviewItemResult {
+  id: string;
+  reportId: string;
+  reviewItemId: string;
+  status: ReviewItemResultStatus;
+  reason: string;
+  evidenceBlockIds: string[];
+  confidence?: number;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ResponseItemResult {
+  id: string;
+  reportId: string;
+  responseItemId: string;
+  status: ResponseItemResultStatus;
+  reason: string;
+  evidenceBlockIds: string[];
+  confidence?: number;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // 问题位置标注

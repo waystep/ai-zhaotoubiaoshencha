@@ -10,10 +10,9 @@ import {
   CheckCircle,
   Clock,
   Download,
-  Play,
   ArrowLeft,
-  Eye,
   MapPin,
+  Bot,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -43,6 +42,21 @@ interface Report {
     projectNo: string;
   };
   issues: Issue[];
+  structuredSummary?: {
+    responseCoverageSummary: {
+      total: number;
+      answered: number;
+      partiallyAnswered: number;
+      unanswered: number;
+      notApplicable: number;
+    };
+    reviewItemsSummary: {
+      total: number;
+      pass: number;
+      fail: number;
+      needsManualReview: number;
+    };
+  };
 }
 
 interface Issue {
@@ -109,8 +123,6 @@ export default function ReportDetailPage() {
   const [hoveredIssue, setHoveredIssue] = useState<Issue["location"] | null>(null);
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-
   const fetchReport = useCallback(async () => {
     try {
       const response = await fetch(`/api/reports/${reportId}`);
@@ -154,39 +166,15 @@ export default function ReportDetailPage() {
     }
   }, [report?.document.id, report?.status, fetchDocumentBlocks]);
 
-  async function handleGenerateReport() {
-    setIsGenerating(true);
-    try {
-      const response = await fetch(`/api/reports/${reportId}/generate`, {
-        method: "POST",
-      });
+  useEffect(() => {
+    if (report?.status !== "in_progress") return;
 
-      if (response.ok) {
-        toast({
-          title: "报告生成中",
-          description: "AI正在分析文档，请稍候...",
-        });
-        // 等待后重新获取报告
-        setTimeout(() => {
-          fetchReport();
-        }, 2000);
-      } else {
-        toast({
-          title: "生成失败",
-          description: "无法启动报告生成",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({
-        title: "网络错误",
-        description: "请检查网络连接",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  }
+    const timer = window.setInterval(() => {
+      void fetchReport();
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [fetchReport, report?.status]);
 
   function selectIssue(issue: Issue) {
     setCurrentPage(issue.location.pageNumber);
@@ -233,6 +221,8 @@ export default function ReportDetailPage() {
         return <CheckCircle className="h-5 w-5 text-green-500" />;
       case "in_progress":
         return <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />;
+      case "failed":
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
       default:
         return <Clock className="h-5 w-5 text-gray-400" />;
     }
@@ -244,6 +234,8 @@ export default function ReportDetailPage() {
         return "已完成";
       case "in_progress":
         return "审查中";
+      case "failed":
+        return "审查失败";
       default:
         return "待审查";
     }
@@ -305,19 +297,10 @@ export default function ReportDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {report.status === "pending" && (
-            <Button onClick={handleGenerateReport} disabled={isGenerating}>
-              {isGenerating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  生成中...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  开始审查
-                </>
-              )}
+          {(report.status === "pending" || report.status === "in_progress" || report.status === "failed") && (
+            <Button onClick={() => router.push(`/reports/${reportId}/chat`)}>
+              <Bot className="mr-2 h-4 w-4" />
+              {report.status === "pending" ? "进入审查会话" : "查看审查会话"}
             </Button>
           )}
           {report.status === "completed" && (
@@ -399,6 +382,60 @@ export default function ReportDetailPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {report.structuredSummary && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>审查项覆盖</CardTitle>
+              <CardDescription>条目级审查结果</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span>总数</span>
+                <span className="font-medium">{report.structuredSummary.reviewItemsSummary.total}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>通过</span>
+                <span className="font-medium">{report.structuredSummary.reviewItemsSummary.pass}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>失败</span>
+                <span className="font-medium text-red-600">{report.structuredSummary.reviewItemsSummary.fail}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>待人工复核</span>
+                <span className="font-medium">{report.structuredSummary.reviewItemsSummary.needsManualReview}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>响应项覆盖</CardTitle>
+              <CardDescription>投标文件是否已回应</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span>总数</span>
+                <span className="font-medium">{report.structuredSummary.responseCoverageSummary.total}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>已回应</span>
+                <span className="font-medium">{report.structuredSummary.responseCoverageSummary.answered}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>部分回应</span>
+                <span className="font-medium">{report.structuredSummary.responseCoverageSummary.partiallyAnswered}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>未回应</span>
+                <span className="font-medium text-red-600">{report.structuredSummary.responseCoverageSummary.unanswered}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* 问题定位工作台（合并版） */}
@@ -488,6 +525,22 @@ export default function ReportDetailPage() {
             <p className="text-muted-foreground text-center">
               AI 正在进行合规性审查，请稍候刷新查看结果...
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {report.status === "failed" && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+            <h3 className="mb-2 text-lg font-semibold">审查失败</h3>
+            <p className="mb-4 text-center text-muted-foreground">
+              这次审查没有完整落库，请进入审查会话查看过程并重新触发。
+            </p>
+            <Button onClick={() => router.push(`/reports/${reportId}/chat`)}>
+              <Bot className="mr-2 h-4 w-4" />
+              打开审查会话
+            </Button>
           </CardContent>
         </Card>
       )}

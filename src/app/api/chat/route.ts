@@ -1,41 +1,89 @@
-// 官方文档：https://mastra.ai/guides/getting-started/next-js
-import { handleChatStream } from '@mastra/ai-sdk';
-import { createUIMessageStreamResponse } from 'ai';
-import { mastra } from '@/mastra';
-import { NextResponse } from 'next/server';
+import { handleChatStream } from "@mastra/ai-sdk";
+import { toAISdkMessages } from "@mastra/ai-sdk/ui";
+import { createUIMessageStreamResponse, type UIMessage } from "ai";
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth/config";
+import { db } from "@/lib/db/client";
+import { reviewReports } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { mastra } from "@/mastra";
 
-// 动态绑定：threadId 和 resourceId 从请求中获取（绑定到具体的 report）
+export const maxDuration = 60;
+
+type ChatRequestBody = {
+  threadId?: string;
+  resourceId?: string;
+  reportId?: string;
+  content?: string;
+  command?: "start-review" | string;
+  messages?: UIMessage[];
+};
+
+function buildLatestMessages(body: ChatRequestBody): UIMessage[] {
+  if (Array.isArray(body.messages) && body.messages.length > 0) {
+    const lastMessage = body.messages[body.messages.length - 1];
+    return lastMessage ? [lastMessage] : [];
+  }
+
+  if (body.content?.trim()) {
+    return [
+      {
+        id: `user-${Date.now()}`,
+        role: "user",
+        parts: [{ type: "text", text: body.content }],
+      },
+    ];
+  }
+
+  return [];
+}
+
+async function markReportInProgress(reportId: string) {
+  await db
+    .update(reviewReports)
+    .set({
+      status: "in_progress",
+      completedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(reviewReports.id, reportId));
+}
+
+async function markReportFailed(reportId: string, error: unknown) {
+  await db
+    .update(reviewReports)
+    .set({
+      status: "failed",
+      aiAnalysis: {
+        error: error instanceof Error ? error.message : "审查流程失败",
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(reviewReports.id, reportId));
+}
+
 export async function POST(req: Request) {
-  const body = await req.json();
-
-  // threadId = reportId（每个报告一个独立的对话线程）
-  // resourceId = reportId（同一个报告的对话历史共享）
-  const threadId = body.threadId || body.reportId || 'default-thread';
-  const resourceId = body.resourceId || body.reportId || 'default-resource';
-
-  // 构建 UIMessage 格式的 messages 数组
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages: any[] = [];
-
-  // 如果有 content 参数，转换为 UIMessage
-  if (body.content) {
-    messages.push({
-      id: `user-${Date.now()}`,
-      role: 'user',
-      parts: [{ type: 'text', text: body.content }]
-    });
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 如果有传入 messages，使用它们
-  if (body.messages && Array.isArray(body.messages)) {
-    messages.push(...body.messages);
-  }
+  const body = (await req.json()) as ChatRequestBody;
+  const reportId = body.reportId;
+  const threadId = body.threadId || reportId || "default-thread";
+  const resourceId = body.resourceId || reportId || "default-resource";
+  const messages = buildLatestMessages(body);
+  const isStartReview = body.command === "start-review";
 
   try {
-    /* eslint-disable @typescript-eslint/no-explicit-any */
+    if (reportId && isStartReview) {
+      await markReportInProgress(reportId);
+    }
+
     const stream = await handleChatStream({
       mastra,
-      agentId: 'tender-review-supervisor',
+      agentId: "tender-review-supervisor",
+      version: "v6",
       params: {
         messages,
         memory: {
@@ -43,37 +91,44 @@ export async function POST(req: Request) {
           resource: resourceId,
         },
       },
-    } as any);
+    });
 
-    // 使用 createUIMessageStreamResponse 创建正确的响应格式
-    return createUIMessageStreamResponse({ stream: stream as any });
-    /* eslint-enable @typescript-eslint/no-explicit-any */
+    return createUIMessageStreamResponse({ stream });
   } catch (error) {
-    console.error('handleChatStream error:', error);
+    console.error("handleChatStream error:", error);
+
+    if (reportId && isStartReview) {
+      await markReportFailed(reportId, error);
+    }
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 },
     );
   }
 }
 
-// 获取历史消息
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const threadId = url.searchParams.get('threadId') || url.searchParams.get('reportId');
-  const resourceId = url.searchParams.get('resourceId') || url.searchParams.get('reportId');
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const memory = await mastra.getAgentById('tender-review-supervisor').getMemory();
+  const url = new URL(req.url);
+  const threadId = url.searchParams.get("threadId") || url.searchParams.get("reportId");
+  const resourceId = url.searchParams.get("resourceId") || url.searchParams.get("reportId");
+
+  const memory = await mastra.getAgentById("tender-review-supervisor").getMemory();
   let response = null;
 
   try {
     response = await memory?.recall({
-      threadId: threadId || 'default-thread',
-      resourceId: resourceId || 'default-resource',
+      threadId: threadId || "default-thread",
+      resourceId: resourceId || "default-resource",
     });
   } catch {
-    console.log('No previous messages found.');
+    response = null;
   }
 
-  return NextResponse.json(response?.messages || []);
+  return NextResponse.json(toAISdkMessages(response?.messages || [], { version: "v6" }));
 }

@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
-import { reviewReports, reviewIssues, documentBlocks } from "@/lib/db/schema";
+import { reviewReports } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { createIssueSchema } from "@/types/review";
 
 interface RouteContext {
   params: Promise<{ reportId: string }>;
 }
 
-// GET: 获取审查报告详情
-export async function GET(
-  request: Request,
-  context: RouteContext
-) {
+export async function GET(request: Request, context: RouteContext) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,6 +33,7 @@ export async function GET(
             id: true,
             name: true,
             projectNo: true,
+            orgId: true,
           },
         },
         reviewer: {
@@ -60,19 +56,66 @@ export async function GET(
             createdAt: true,
           },
         },
+        reviewItemResults: {
+          with: {
+            reviewItem: {
+              columns: {
+                id: true,
+                itemType: true,
+                itemNo: true,
+                title: true,
+                description: true,
+                consequence: true,
+              },
+            },
+          },
+        },
+        responseItemResults: {
+          with: {
+            responseItem: {
+              columns: {
+                id: true,
+                responseType: true,
+                itemNo: true,
+                title: true,
+                description: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    if (!report) {
-      return NextResponse.json({ error: "报告不存在" }, { status: 404 });
+    if (!report || report.project?.orgId !== session.user?.orgId) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ report });
+    const responseCoverageSummary = {
+      total: report.responseItemResults.length,
+      answered: report.responseItemResults.filter((item) => item.status === "answered").length,
+      partiallyAnswered: report.responseItemResults.filter((item) => item.status === "partially_answered").length,
+      unanswered: report.responseItemResults.filter((item) => item.status === "unanswered").length,
+      notApplicable: report.responseItemResults.filter((item) => item.status === "not_applicable").length,
+    };
+
+    const reviewItemsSummary = {
+      total: report.reviewItemResults.length,
+      pass: report.reviewItemResults.filter((item) => item.status === "pass").length,
+      fail: report.reviewItemResults.filter((item) => item.status === "fail").length,
+      needsManualReview: report.reviewItemResults.filter((item) => item.status === "needs_manual_review").length,
+    };
+
+    return NextResponse.json({
+      report: {
+        ...report,
+        structuredSummary: {
+          responseCoverageSummary,
+          reviewItemsSummary,
+        },
+      },
+    });
   } catch (error) {
-    console.error("获取审查报告失败:", error);
-    return NextResponse.json(
-      { error: "获取审查报告失败" },
-      { status: 500 }
-    );
+    console.error("Failed to fetch review report:", error);
+    return NextResponse.json({ error: "Failed to fetch review report" }, { status: 500 });
   }
 }

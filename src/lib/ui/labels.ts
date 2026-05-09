@@ -19,6 +19,8 @@ export function reviewStatusLabel(status: string): string {
       return "已完成";
     case "in_progress":
       return "审查中";
+    case "failed":
+      return "审查失败";
     case "pending":
       return "待审查";
     default:

@@ -355,7 +355,7 @@ export default function DocumentDetailPage() {
               <p className="text-muted-foreground">
                 {getDocTypeLabel(document.docType)}{` · `}
                 {(document.fileSize / 1024 / 1024).toFixed(2)} MB{` · `}
-                {new Date(document.parsedAt).toLocaleDateString("zh-CN")}
+                {document.parsedAt ? new Date(document.parsedAt).toLocaleDateString("zh-CN") : "未解析"}
               </p>
             </div>
           </div>

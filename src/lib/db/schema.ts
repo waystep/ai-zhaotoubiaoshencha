@@ -54,6 +54,7 @@ export const reviewStatusEnum = pgEnum("review_status", [
   "pending",       // 待审查
   "in_progress",   // 审查中
   "completed",     // 已完成
+  "failed",        // 审查失败
 ]);
 
 // 问题严重程度
@@ -62,6 +63,19 @@ export const issueSeverityEnum = pgEnum("issue_severity", [
   "major",         // 重要问题
   "minor",         // 轻微问题
   "suggestion",    // 建议
+]);
+
+export const reviewItemResultStatusEnum = pgEnum("review_item_result_status", [
+  "pass",
+  "fail",
+  "needs_manual_review",
+]);
+
+export const responseItemResultStatusEnum = pgEnum("response_item_result_status", [
+  "answered",
+  "partially_answered",
+  "unanswered",
+  "not_applicable",
 ]);
 
 // 解析状态
@@ -355,6 +369,40 @@ export const reviewIssues = pgTable("review_issues", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const reviewItemResults = pgTable("review_item_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reportId: uuid("report_id")
+    .notNull()
+    .references(() => reviewReports.id, { onDelete: "cascade" }),
+  reviewItemId: uuid("review_item_id")
+    .notNull()
+    .references(() => reviewItems.id, { onDelete: "cascade" }),
+  status: reviewItemResultStatusEnum("status").notNull(),
+  reason: text("reason").notNull(),
+  evidenceBlockIds: jsonb("evidence_block_ids").default([]),
+  confidence: decimal("confidence", { precision: 5, scale: 2 }),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const responseItemResults = pgTable("response_item_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reportId: uuid("report_id")
+    .notNull()
+    .references(() => reviewReports.id, { onDelete: "cascade" }),
+  responseItemId: uuid("response_item_id")
+    .notNull()
+    .references(() => responseItems.id, { onDelete: "cascade" }),
+  status: responseItemResultStatusEnum("status").notNull(),
+  reason: text("reason").notNull(),
+  evidenceBlockIds: jsonb("evidence_block_ids").default([]),
+  confidence: decimal("confidence", { precision: 5, scale: 2 }),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ==================== 审查项与响应项 ====================
 
 // 审查项表 - 存储从招标文件和法律文件中提取的强制性要求条款
@@ -639,6 +687,8 @@ export const reviewReportsRelations = relations(reviewReports, ({ one, many }) =
     references: [users.id],
   }),
   issues: many(reviewIssues),
+  reviewItemResults: many(reviewItemResults),
+  responseItemResults: many(responseItemResults),
 }));
 
 export const reviewIssuesRelations = relations(reviewIssues, ({ one }) => ({
@@ -652,7 +702,29 @@ export const reviewIssuesRelations = relations(reviewIssues, ({ one }) => ({
   }),
 }));
 
-export const reviewItemsRelations = relations(reviewItems, ({ one }) => ({
+export const reviewItemResultsRelations = relations(reviewItemResults, ({ one }) => ({
+  report: one(reviewReports, {
+    fields: [reviewItemResults.reportId],
+    references: [reviewReports.id],
+  }),
+  reviewItem: one(reviewItems, {
+    fields: [reviewItemResults.reviewItemId],
+    references: [reviewItems.id],
+  }),
+}));
+
+export const responseItemResultsRelations = relations(responseItemResults, ({ one }) => ({
+  report: one(reviewReports, {
+    fields: [responseItemResults.reportId],
+    references: [reviewReports.id],
+  }),
+  responseItem: one(responseItems, {
+    fields: [responseItemResults.responseItemId],
+    references: [responseItems.id],
+  }),
+}));
+
+export const reviewItemsRelations = relations(reviewItems, ({ one, many }) => ({
   project: one(tenderProjects, {
     fields: [reviewItems.projectId],
     references: [tenderProjects.id],
@@ -669,9 +741,10 @@ export const reviewItemsRelations = relations(reviewItems, ({ one }) => ({
     fields: [reviewItems.verifiedBy],
     references: [users.id],
   }),
+  results: many(reviewItemResults),
 }));
 
-export const responseItemsRelations = relations(responseItems, ({ one }) => ({
+export const responseItemsRelations = relations(responseItems, ({ one, many }) => ({
   project: one(tenderProjects, {
     fields: [responseItems.projectId],
     references: [tenderProjects.id],
@@ -688,6 +761,7 @@ export const responseItemsRelations = relations(responseItems, ({ one }) => ({
     fields: [responseItems.verifiedBy],
     references: [users.id],
   }),
+  results: many(responseItemResults),
 }));
 
 export const bidSubmissionsRelations = relations(bidSubmissions, ({ one }) => ({
