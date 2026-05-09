@@ -8,7 +8,7 @@ import { reportGenerationAgent } from "./report-generation-agent";
 import { documentReaderTool } from "../tools/document-reader-tool";
 import { getReviewItemsTool } from "../tools/get-review-items-tool";
 import { getResponseItemsTool } from "../tools/get-response-items-tool";
-import { getDocumentInfoTool } from "../tools/get-document-info-tool";
+import { getStandardDocumentsParseStatusTool } from "../tools/get-standard-documents-parse-status-tool";
 import {
   reviewModelConfig,
   supervisorInstructions,
@@ -69,6 +69,6 @@ export const tenderReviewSupervisor = new Agent({
     documentReaderTool,
     getReviewItemsTool,
     getResponseItemsTool,
-    getDocumentInfoTool,
+    getStandardDocumentsParseStatusTool,
   },
 });

@@ -1,10 +1,8 @@
 import { handleChatStream } from "@mastra/ai-sdk";
 import { createUIMessageStreamResponse } from "ai";
-import { eq } from "drizzle-orm";
+
 import { mastra } from "@/mastra";
 import { auth } from "@/lib/auth/config";
-import { db } from "@/lib/db/client";
-import { documents } from "@/lib/db/schema";
 
 export const maxDuration = 60;
 
@@ -15,31 +13,40 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { documentId, prompt }: { documentId?: string; prompt: string } = await req.json();
+    const {
+      reportId,
+      projectId,
+      bidDocumentId,
+      documentId,
+      prompt,
+    }: {
+      reportId?: string;
+      projectId?: string;
+      bidDocumentId?: string;
+      documentId?: string;
+      prompt?: string;
+    } = await req.json();
 
-    let contextMessage = "";
-    if (documentId) {
-      const doc = await db.query.documents.findFirst({
-        where: eq(documents.id, documentId),
-        with: {
-          parsedResult: {
-            with: {
-              blocks: { limit: 100 },
-            },
-          },
-        },
-      });
+    const targetBidDocumentId = bidDocumentId || documentId;
 
-      if (doc?.parsedResult) {
-        const fullText = doc.parsedResult.fullText || "";
-        const blocksText = doc.parsedResult.blocks
-          ?.map((block) => `[页${block.pageNumber}] ${block.content}`)
-          .join("\n")
-          .slice(0, 5000);
-
-        contextMessage = `\n\n以下是待审查的文档内容（节选）:\n${blocksText || fullText.slice(0, 5000)}`;
-      }
+    if (!projectId || !targetBidDocumentId) {
+      return Response.json(
+        { error: "缺少必要参数：projectId, bidDocumentId" },
+        { status: 400 }
+      );
     }
+
+    const reviewPrompt = `
+请审查该项目中的投标文件，并将结构化结果保存到数据库。
+
+输入：
+- reportId: ${reportId || "未提供"}
+- projectId: ${projectId}
+- bidDocumentId: ${targetBidDocumentId}
+
+补充说明：
+${prompt || "无"}
+`;
 
     const stream = await handleChatStream({
       mastra,
@@ -53,7 +60,7 @@ export async function POST(req: Request) {
             parts: [
               {
                 type: "text",
-                text: prompt + contextMessage,
+                text: reviewPrompt,
               },
             ],
           },
@@ -65,8 +72,11 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("AI review error:", error);
     return Response.json(
-      { error: "审查请求处理失败", details: error instanceof Error ? error.message : undefined },
-      { status: 500 },
+      {
+        error: "审查请求处理失败",
+        details: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
     );
   }
 }

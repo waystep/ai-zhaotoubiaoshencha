@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
-import { reviewReports } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { documents, reviewReports } from "@/lib/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 
 interface RouteContext {
   params: Promise<{ reportId: string }>;
@@ -26,6 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
             name: true,
             docType: true,
             parseStatus: true,
+            mimeType: true,
           },
         },
         project: {
@@ -46,6 +47,8 @@ export async function GET(request: Request, context: RouteContext) {
         issues: {
           columns: {
             id: true,
+            blockId: true,
+            checkpointId: true,
             category: true,
             severity: true,
             title: true,
@@ -57,6 +60,18 @@ export async function GET(request: Request, context: RouteContext) {
           },
         },
         reviewItemResults: {
+          columns: {
+            id: true,
+            reportId: true,
+            reviewItemId: true,
+            status: true,
+            reason: true,
+            evidenceBlockIds: true,
+            confidence: true,
+            metadata: true,
+            createdAt: true,
+            updatedAt: true,
+          },
           with: {
             reviewItem: {
               columns: {
@@ -66,11 +81,24 @@ export async function GET(request: Request, context: RouteContext) {
                 title: true,
                 description: true,
                 consequence: true,
+                location: true,
               },
             },
           },
         },
         responseItemResults: {
+          columns: {
+            id: true,
+            reportId: true,
+            responseItemId: true,
+            status: true,
+            reason: true,
+            evidenceBlockIds: true,
+            confidence: true,
+            metadata: true,
+            createdAt: true,
+            updatedAt: true,
+          },
           with: {
             responseItem: {
               columns: {
@@ -79,6 +107,7 @@ export async function GET(request: Request, context: RouteContext) {
                 itemNo: true,
                 title: true,
                 description: true,
+                location: true,
               },
             },
           },
@@ -105,9 +134,25 @@ export async function GET(request: Request, context: RouteContext) {
       needsManualReview: report.reviewItemResults.filter((item) => item.status === "needs_manual_review").length,
     };
 
+    const standardDocuments = await db.query.documents.findMany({
+      where: and(
+        eq(documents.projectId, report.project.id),
+        inArray(documents.docType, ["tender_doc", "legal_doc"])
+      ),
+      columns: {
+        id: true,
+        name: true,
+        docType: true,
+        parseStatus: true,
+        mimeType: true,
+      },
+      orderBy: [documents.createdAt],
+    });
+
     return NextResponse.json({
       report: {
         ...report,
+        standardDocuments,
         structuredSummary: {
           responseCoverageSummary,
           reviewItemsSummary,

@@ -1,83 +1,54 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  ClipboardCheck,
-  FileText,
-  Loader2,
   AlertCircle,
+  ArrowLeft,
+  Bot,
   CheckCircle,
+  ChevronRight,
+  ClipboardCheck,
   Clock,
   Download,
-  ArrowLeft,
+  FileSearch,
+  FileText,
+  Loader2,
   MapPin,
-  Bot,
 } from "lucide-react";
-import Link from "next/link";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { IssueLocationViewer } from "@/components/review/issue-location-viewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PdfViewer } from "@/components/document/pdf-viewer";
+import { IssueLocationViewer } from "@/components/review/issue-location-viewer";
+import { useToast } from "@/hooks/use-toast";
 
-interface Report {
-  id: string;
-  status: string;
-  aiScore: string | null;
-  summary: string | null;
-  recommendation: string | null;
-  createdAt: string;
-  completedAt: string | null;
-  document: {
-    id: string;
-    name: string;
-    docType: string;
-    parseStatus: string;
-  };
-  project: {
-    id: string;
-    name: string;
-    projectNo: string;
-  };
-  issues: Issue[];
-  structuredSummary?: {
-    responseCoverageSummary: {
-      total: number;
-      answered: number;
-      partiallyAnswered: number;
-      unanswered: number;
-      notApplicable: number;
-    };
-    reviewItemsSummary: {
-      total: number;
-      pass: number;
-      fail: number;
-      needsManualReview: number;
-    };
+interface IssueLocation {
+  pageNumber: number;
+  blockIndex: number;
+  textSnippet?: string;
+  highlightText?: string;
+  bbox?: {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
   };
 }
 
 interface Issue {
   id: string;
+  blockId?: string | null;
+  checkpointId?: string | null;
   category: string;
   severity: "critical" | "major" | "minor" | "suggestion";
   title: string;
   description: string;
-  location: {
-    pageNumber: number;
-    blockIndex: number;
-    textSnippet?: string;
-    highlightText?: string;
-    bbox?: {
-      x0: number;
-      y0: number;
-      x1: number;
-      y1: number;
-    };
-  };
-  suggestion?: string | null | undefined;
+  location: IssueLocation;
+  suggestion?: string | null;
   isResolved: boolean;
 }
 
@@ -95,97 +66,300 @@ interface DocumentBlock {
   };
 }
 
-const severityColors = {
-  critical: "bg-red-100 text-red-700 border-red-200",
-  major: "bg-orange-100 text-orange-700 border-orange-200",
-  minor: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  suggestion: "bg-blue-100 text-blue-700 border-blue-200",
-};
+interface StandardDocument {
+  id: string;
+  name: string;
+  docType: string;
+  parseStatus: string;
+  mimeType: string;
+}
 
-const severityLabels = {
-  critical: "严重",
-  major: "重要",
-  minor: "轻微",
-  suggestion: "建议",
-};
+interface ReviewItemResult {
+  id: string;
+  reviewItemId: string;
+  status: "pass" | "fail" | "needs_manual_review";
+  reason: string;
+  evidenceBlockIds: string[];
+  confidence?: string | null;
+  metadata?: Record<string, unknown>;
+  reviewItem: {
+    id: string;
+    itemType: string;
+    itemNo?: string | null;
+    title: string;
+    description: string;
+    consequence?: string | null;
+    location: IssueLocation;
+  };
+}
+
+interface ResponseItemResult {
+  id: string;
+  responseItemId: string;
+  status: "answered" | "partially_answered" | "unanswered" | "not_applicable";
+  reason: string;
+  evidenceBlockIds: string[];
+  confidence?: string | null;
+  metadata?: Record<string, unknown>;
+  responseItem: {
+    id: string;
+    responseType: string;
+    itemNo?: string | null;
+    title: string;
+    description: string;
+    location: IssueLocation;
+  };
+}
+
+interface Report {
+  id: string;
+  status: string;
+  aiScore: string | null;
+  summary: string | null;
+  recommendation: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  document: {
+    id: string;
+    name: string;
+    docType: string;
+    parseStatus: string;
+    mimeType: string;
+  };
+  project: {
+    id: string;
+    name: string;
+    projectNo: string;
+  };
+  issues: Issue[];
+  reviewItemResults: ReviewItemResult[];
+  responseItemResults: ResponseItemResult[];
+  standardDocuments: StandardDocument[];
+  structuredSummary?: {
+    responseCoverageSummary: {
+      total: number;
+      answered: number;
+      partiallyAnswered: number;
+      unanswered: number;
+      notApplicable: number;
+    };
+    reviewItemsSummary: {
+      total: number;
+      pass: number;
+      fail: number;
+      needsManualReview: number;
+    };
+  };
+}
+
+const reviewStatusLabels = {
+  pass: "通过",
+  fail: "不满足",
+  needs_manual_review: "待人工复核",
+} as const;
+
+const reviewStatusClasses = {
+  pass: "bg-green-100 text-green-700 border-green-200",
+  fail: "bg-red-100 text-red-700 border-red-200",
+  needs_manual_review: "bg-yellow-100 text-yellow-700 border-yellow-200",
+} as const;
+
+const responseStatusLabels = {
+  answered: "已响应",
+  partially_answered: "部分响应",
+  unanswered: "未响应",
+  not_applicable: "不适用",
+} as const;
+
+const responseStatusClasses = {
+  answered: "bg-green-100 text-green-700 border-green-200",
+  partially_answered: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  unanswered: "bg-red-100 text-red-700 border-red-200",
+  not_applicable: "bg-slate-100 text-slate-700 border-slate-200",
+} as const;
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case "completed":
+      return "已完成";
+    case "in_progress":
+      return "审查中";
+    case "failed":
+      return "审查失败";
+    default:
+      return "待审查";
+  }
+}
+
+function getDocTypeLabel(docType: string) {
+  switch (docType) {
+    case "tender_doc":
+      return "招标文件";
+    case "legal_doc":
+      return "法律文件";
+    case "bid_doc":
+      return "投标文件";
+    default:
+      return docType;
+  }
+}
+
+function getStatusIcon(status: string) {
+  switch (status) {
+    case "completed":
+      return <CheckCircle className="h-5 w-5 text-green-500" />;
+    case "in_progress":
+      return <Loader2 className="h-5 w-5 animate-spin text-yellow-500" />;
+    case "failed":
+      return <AlertCircle className="h-5 w-5 text-red-500" />;
+    default:
+      return <Clock className="h-5 w-5 text-gray-400" />;
+  }
+}
+
+function buildLocationFromBlock(block: DocumentBlock): IssueLocation {
+  return {
+    pageNumber: block.pageNumber,
+    blockIndex: block.blockIndex,
+    textSnippet: block.content.slice(0, 120),
+    highlightText: block.content.slice(0, 80),
+    bbox: block.bbox,
+  };
+}
+
+function ResultSectionHeader({
+  title,
+  description,
+  count,
+}: {
+  title: string;
+  description: string;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Badge variant="outline">{count} 项</Badge>
+    </div>
+  );
+}
 
 export default function ReportDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const reportId = params.reportId as string;
   const { toast } = useToast();
+  const reportId = params.reportId as string;
 
   const [report, setReport] = useState<Report | null>(null);
-  const [blocks, setBlocks] = useState<DocumentBlock[]>([]);
+  const [bidBlocks, setBidBlocks] = useState<DocumentBlock[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  // 一次性触发 PdfViewer 定位滚动：滚动完成后会自动清理，避免“滚动回弹”
-  const [focusedIssueOnce, setFocusedIssueOnce] = useState<Issue["location"] | null>(null);
-  const [hoveredIssue, setHoveredIssue] = useState<Issue["location"] | null>(null);
+  const [focusedIssueOnce, setFocusedIssueOnce] = useState<IssueLocation | null>(null);
+  const [hoveredIssue, setHoveredIssue] = useState<IssueLocation | null>(null);
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [selectedStandardDocId, setSelectedStandardDocId] = useState<string>("");
+  const [standardBlocks, setStandardBlocks] = useState<DocumentBlock[]>([]);
+  const [standardPage, setStandardPage] = useState(1);
+  const [isStandardPreviewLoading, setIsStandardPreviewLoading] = useState(false);
+
   const fetchReport = useCallback(async () => {
     try {
       const response = await fetch(`/api/reports/${reportId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setReport(data.report);
-      } else {
-        toast({
-          title: "加载失败",
-          description: "无法获取审查报告",
-          variant: "destructive",
-        });
+      if (!response.ok) {
+        throw new Error("无法获取审查报告");
       }
+      const data = await response.json();
+      setReport(data.report);
     } catch (error) {
-      console.error("获取报告失败:", error);
+      toast({
+        title: "加载失败",
+        description: error instanceof Error ? error.message : "无法获取审查报告",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   }, [reportId, toast]);
 
-  const fetchDocumentBlocks = useCallback(async () => {
+  const fetchBlocks = useCallback(async (documentId: string) => {
+    const response = await fetch(`/api/documents/${documentId}/blocks`);
+    if (!response.ok) {
+      throw new Error("无法获取文档区块");
+    }
+    const data = await response.json();
+    return (data.blocks || []) as DocumentBlock[];
+  }, []);
+
+  const fetchBidBlocks = useCallback(async () => {
     if (!report?.document.id) return;
     try {
-      const response = await fetch(`/api/documents/${report.document.id}/blocks`);
-      if (response.ok) {
-        const data = await response.json();
-        setBlocks(data.blocks || []);
-      }
+      const nextBlocks = await fetchBlocks(report.document.id);
+      setBidBlocks(nextBlocks);
     } catch (error) {
-      console.error("获取文档区块失败:", error);
+      console.error("获取投标文件区块失败:", error);
     }
-  }, [report?.document.id]);
+  }, [fetchBlocks, report?.document.id]);
+
+  const fetchStandardBlocks = useCallback(
+    async (documentId: string) => {
+      setIsStandardPreviewLoading(true);
+      try {
+        const nextBlocks = await fetchBlocks(documentId);
+        setStandardBlocks(nextBlocks);
+      } catch (error) {
+        console.error("获取标准文件区块失败:", error);
+        setStandardBlocks([]);
+      } finally {
+        setIsStandardPreviewLoading(false);
+      }
+    },
+    [fetchBlocks]
+  );
 
   useEffect(() => {
-    fetchReport();
+    void fetchReport();
   }, [fetchReport]);
 
   useEffect(() => {
-    if (report?.document.id && report.status === "completed") {
-      fetchDocumentBlocks();
-    }
-  }, [report?.document.id, report?.status, fetchDocumentBlocks]);
+    if (!report?.document.id || report.status !== "completed") return;
+    void fetchBidBlocks();
+  }, [fetchBidBlocks, report?.document.id, report?.status]);
 
   useEffect(() => {
     if (report?.status !== "in_progress") return;
-
     const timer = window.setInterval(() => {
       void fetchReport();
     }, 5000);
-
     return () => window.clearInterval(timer);
   }, [fetchReport, report?.status]);
 
-  function selectIssue(issue: Issue) {
-    setCurrentPage(issue.location.pageNumber);
-    setFocusedIssueOnce(issue.location);
-  }
+  useEffect(() => {
+    if (!report?.standardDocuments?.length) return;
+    if (selectedStandardDocId) return;
+    setSelectedStandardDocId(report.standardDocuments[0].id);
+  }, [report?.standardDocuments, selectedStandardDocId]);
+
+  useEffect(() => {
+    if (!selectedStandardDocId) return;
+    void fetchStandardBlocks(selectedStandardDocId);
+  }, [fetchStandardBlocks, selectedStandardDocId]);
+
+  const bidBlockById = useMemo(() => {
+    const map = new Map<string, DocumentBlock>();
+    for (const block of bidBlocks) {
+      map.set(block.id, block);
+    }
+    return map;
+  }, [bidBlocks]);
 
   const issueNoById = useMemo(() => {
     const map: Record<string, number> = {};
     for (let i = 0; i < (report?.issues?.length ?? 0); i++) {
-      const it = report!.issues[i];
-      map[it.id] = i + 1;
+      map[report!.issues[i].id] = i + 1;
     }
     return map;
   }, [report?.issues]);
@@ -193,70 +367,87 @@ export default function ReportDetailPage() {
   const issueNoByKey = useMemo(() => {
     const map: Record<string, number> = {};
     for (let i = 0; i < (report?.issues?.length ?? 0); i++) {
-      const it = report!.issues[i];
-      map[`${it.location.pageNumber}-${it.location.blockIndex}`] = i + 1;
+      const issue = report!.issues[i];
+      map[`${issue.location.pageNumber}-${issue.location.blockIndex}`] = i + 1;
     }
     return map;
   }, [report?.issues]);
 
   const issueIdByKey = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const it of report?.issues ?? []) {
-      map[`${it.location.pageNumber}-${it.location.blockIndex}`] = it.id;
+    for (const issue of report?.issues ?? []) {
+      map[`${issue.location.pageNumber}-${issue.location.blockIndex}`] = issue.id;
     }
     return map;
   }, [report?.issues]);
 
-  function handleLocateClick(issue: Issue) {
-    selectIssue(issue);
-  }
+  const selectLocation = useCallback((location: IssueLocation) => {
+    setCurrentPage(location.pageNumber);
+    setFocusedIssueOnce(location);
+  }, []);
 
-  function handlePageChange(pageNumber: number) {
-    setCurrentPage(pageNumber);
-  }
+  const selectIssue = useCallback(
+    (issue: Issue) => {
+      selectLocation(issue.location);
+    },
+    [selectLocation]
+  );
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case "in_progress":
-        return <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />;
-      case "failed":
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      default:
-        return <Clock className="h-5 w-5 text-gray-400" />;
-    }
-  };
+  const locateResult = useCallback(
+    (result: {
+      evidenceBlockIds?: string[];
+      itemId: string;
+      itemTitle: string;
+    }) => {
+      const firstEvidenceBlock = (result.evidenceBlockIds || [])
+        .map((id) => bidBlockById.get(id))
+        .find(Boolean);
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "已完成";
-      case "in_progress":
-        return "审查中";
-      case "failed":
-        return "审查失败";
-      default:
-        return "待审查";
-    }
-  };
+      if (firstEvidenceBlock) {
+        selectLocation(buildLocationFromBlock(firstEvidenceBlock));
+        return;
+      }
 
-  const getDocTypeLabel = (docType: string) => {
-    switch (docType) {
-      case "tender_doc":
-        return "招标文件";
-      case "legal_doc":
-        return "法律文件";
-      case "bid_doc":
-        return "投标文件";
-      default:
-        return docType;
-    }
-  };
+      const matchedIssue = (report?.issues || []).find((issue) => issue.checkpointId === result.itemId);
+      if (matchedIssue) {
+        selectIssue(matchedIssue);
+        return;
+      }
+
+      toast({
+        title: "暂无可定位证据",
+        description: `${result.itemTitle} 当前没有关联到具体的投标文件区块位置`,
+        variant: "destructive",
+      });
+    },
+    [bidBlockById, report?.issues, selectIssue, selectLocation, toast]
+  );
+
+  const handleLocateReviewItem = useCallback(
+    (result: ReviewItemResult) => {
+      locateResult({
+        evidenceBlockIds: result.evidenceBlockIds,
+        itemId: result.reviewItem.id,
+        itemTitle: result.reviewItem.title,
+      });
+    },
+    [locateResult]
+  );
+
+  const handleLocateResponseItem = useCallback(
+    (result: ResponseItemResult) => {
+      locateResult({
+        evidenceBlockIds: result.evidenceBlockIds,
+        itemId: result.responseItem.id,
+        itemTitle: result.responseItem.title,
+      });
+    },
+    [locateResult]
+  );
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -266,11 +457,9 @@ export default function ReportDetailPage() {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">报告不存在</h3>
-          <p className="text-muted-foreground text-center mb-4">
-            请检查报告 ID 是否正确
-          </p>
+          <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold">报告不存在</h3>
+          <p className="mb-4 text-center text-muted-foreground">请检查报告 ID 是否正确</p>
           <Button variant="outline" onClick={() => router.push("/projects")}>
             返回项目列表
           </Button>
@@ -281,14 +470,13 @@ export default function ReportDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* 报告头部 */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <Link
             href={`/projects/${report.project.id}`}
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-2"
+            className="mb-2 inline-flex items-center text-sm text-muted-foreground hover:text-primary"
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
+            <ArrowLeft className="mr-1 h-4 w-4" />
             返回项目详情
           </Link>
           <h2 className="text-3xl font-bold tracking-tight">审查报告</h2>
@@ -297,7 +485,9 @@ export default function ReportDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {(report.status === "pending" || report.status === "in_progress" || report.status === "failed") && (
+          {(report.status === "pending" ||
+            report.status === "in_progress" ||
+            report.status === "failed") && (
             <Button onClick={() => router.push(`/reports/${reportId}/chat`)}>
               <Bot className="mr-2 h-4 w-4" />
               {report.status === "pending" ? "进入审查会话" : "查看审查会话"}
@@ -312,7 +502,6 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {/* 报告概览 */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -326,13 +515,11 @@ export default function ReportDetailPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI评分</CardTitle>
+            <CardTitle className="text-sm font-medium">AI 评分</CardTitle>
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {report.aiScore ? `${report.aiScore}分` : "--"}
-            </div>
+            <div className="text-2xl font-bold">{report.aiScore ? `${report.aiScore} 分` : "--"}</div>
           </CardContent>
         </Card>
 
@@ -352,31 +539,31 @@ export default function ReportDetailPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold truncate" title={report.document.name}>
+            <div className="truncate text-lg font-semibold" title={report.document.name}>
               {report.document.name}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {getDocTypeLabel(report.document.docType)}
-            </p>
+            <p className="text-xs text-muted-foreground">{getDocTypeLabel(report.document.docType)}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* 审查摘要 */}
       {report.summary && (
         <Card>
           <CardHeader>
             <CardTitle>审查摘要</CardTitle>
-            <CardDescription>
-              AI 生成的审查结论和建议
-            </CardDescription>
+            <CardDescription>AI 生成的审查结论和建议</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">{report.summary}</p>
             {report.recommendation && (
-              <div className="mt-4 p-4 rounded-lg bg-primary/10">
+              <div className="mt-4 rounded-lg bg-primary/10 p-4">
                 <p className="font-semibold text-primary">
-                  建议结论: {report.recommendation === "pass" ? "通过" : report.recommendation === "fail" ? "不通过" : "整改后通过"}
+                  建议结论:{" "}
+                  {report.recommendation === "pass"
+                    ? "通过"
+                    : report.recommendation === "fail"
+                      ? "不通过"
+                      : "整改后通过"}
                 </p>
               </div>
             )}
@@ -388,8 +575,8 @@ export default function ReportDetailPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>审查项覆盖</CardTitle>
-              <CardDescription>条目级审查结果</CardDescription>
+              <CardTitle>审查项结果概览</CardTitle>
+              <CardDescription>条目级审查结果统计</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
@@ -401,20 +588,24 @@ export default function ReportDetailPage() {
                 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.pass}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>失败</span>
-                <span className="font-medium text-red-600">{report.structuredSummary.reviewItemsSummary.fail}</span>
+                <span>不满足</span>
+                <span className="font-medium text-red-600">
+                  {report.structuredSummary.reviewItemsSummary.fail}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span>待人工复核</span>
-                <span className="font-medium">{report.structuredSummary.reviewItemsSummary.needsManualReview}</span>
+                <span className="font-medium">
+                  {report.structuredSummary.reviewItemsSummary.needsManualReview}
+                </span>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>响应项覆盖</CardTitle>
-              <CardDescription>投标文件是否已回应</CardDescription>
+              <CardTitle>响应项结果概览</CardTitle>
+              <CardDescription>投标文件响应覆盖情况</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
@@ -422,108 +613,289 @@ export default function ReportDetailPage() {
                 <span className="font-medium">{report.structuredSummary.responseCoverageSummary.total}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>已回应</span>
+                <span>已响应</span>
                 <span className="font-medium">{report.structuredSummary.responseCoverageSummary.answered}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>部分回应</span>
-                <span className="font-medium">{report.structuredSummary.responseCoverageSummary.partiallyAnswered}</span>
+                <span>部分响应</span>
+                <span className="font-medium">
+                  {report.structuredSummary.responseCoverageSummary.partiallyAnswered}
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>未回应</span>
-                <span className="font-medium text-red-600">{report.structuredSummary.responseCoverageSummary.unanswered}</span>
+                <span>未响应</span>
+                <span className="font-medium text-red-600">
+                  {report.structuredSummary.responseCoverageSummary.unanswered}
+                </span>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* 问题定位工作台（合并版） */}
-      {report.status === "completed" && report.issues && report.issues.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4" />
-            选择问题定位到 PDF；滚动 PDF 时默认按当前页筛选。
+      {report.status === "completed" && (
+        <>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.2fr)]">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>结构化审查结果</CardTitle>
+                  <CardDescription>点击任一结果可定位到对应的投标文件位置</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="review-items" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="review-items">审查项结果</TabsTrigger>
+                      <TabsTrigger value="response-items">响应项结果</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="review-items" className="space-y-3">
+                      <ResultSectionHeader
+                        title="审查项结果"
+                        description="核验投标文件是否满足强制性或合规性要求"
+                        count={report.reviewItemResults.length}
+                      />
+                      <div className="space-y-3">
+                        {report.reviewItemResults.map((result) => (
+                          <button
+                            key={result.id}
+                            type="button"
+                            onClick={() => handleLocateReviewItem(result)}
+                            className="w-full rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/30"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Badge className={reviewStatusClasses[result.status]}>
+                                    {reviewStatusLabels[result.status]}
+                                  </Badge>
+                                  {result.reviewItem.itemNo && (
+                                    <Badge variant="outline">{result.reviewItem.itemNo}</Badge>
+                                  )}
+                                  <Badge variant="secondary">{result.reviewItem.itemType}</Badge>
+                                </div>
+                                <p className="mt-2 font-medium">{result.reviewItem.title}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {result.reviewItem.description}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{result.evidenceBlockIds?.length ?? 0} 个证据块</span>
+                                <ChevronRight className="h-4 w-4" />
+                              </div>
+                            </div>
+                            <div className="mt-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                              {result.reason}
+                            </div>
+                            {result.reviewItem.consequence && (
+                              <p className="mt-2 text-xs text-red-600">
+                                不满足后果: {result.reviewItem.consequence}
+                              </p>
+                            )}
+                          </button>
+                        ))}
+                        {report.reviewItemResults.length === 0 && (
+                          <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                            暂无审查项结果
+                          </div>
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="response-items" className="space-y-3">
+                      <ResultSectionHeader
+                        title="响应项结果"
+                        description="核验投标文件是否对要求内容作出完整响应"
+                        count={report.responseItemResults.length}
+                      />
+                      <div className="space-y-3">
+                        {report.responseItemResults.map((result) => (
+                          <button
+                            key={result.id}
+                            type="button"
+                            onClick={() => handleLocateResponseItem(result)}
+                            className="w-full rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/30"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Badge className={responseStatusClasses[result.status]}>
+                                    {responseStatusLabels[result.status]}
+                                  </Badge>
+                                  {result.responseItem.itemNo && (
+                                    <Badge variant="outline">{result.responseItem.itemNo}</Badge>
+                                  )}
+                                  <Badge variant="secondary">{result.responseItem.responseType}</Badge>
+                                </div>
+                                <p className="mt-2 font-medium">{result.responseItem.title}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {result.responseItem.description}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{result.evidenceBlockIds?.length ?? 0} 个证据块</span>
+                                <ChevronRight className="h-4 w-4" />
+                              </div>
+                            </div>
+                            <div className="mt-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                              {result.reason}
+                            </div>
+                          </button>
+                        ))}
+                        {report.responseItemResults.length === 0 && (
+                          <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                            暂无响应项结果
+                          </div>
+                        )}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+
+              <IssueLocationViewer
+                issues={report.issues}
+                currentPage={currentPage}
+                onIssueClick={selectIssue}
+                onIssueHover={(issue) => {
+                  setHoveredIssue(issue?.location ?? null);
+                  setHoveredIssueId(issue?.id ?? null);
+                }}
+                hoveredIssueId={hoveredIssueId ?? undefined}
+                issueNoById={issueNoById}
+              />
+            </div>
+
+            <div className="space-y-6">
+              <Card className="bg-muted/20 shadow-sm">
+                <CardHeader>
+                  <CardTitle>投标文件定位预览</CardTitle>
+                  <CardDescription>点击左侧结果后，在这里定位到投标文件的具体位置</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {bidBlocks.length > 0 ? (
+                    <PdfViewer
+                      documentId={report.document.id}
+                      blocks={bidBlocks}
+                      highlightedIssues={report.issues.map((issue) => issue.location)}
+                      focusedIssue={focusedIssueOnce}
+                      hoveredIssue={hoveredIssue}
+                      issueNoByKey={issueNoByKey}
+                      onIssueHover={(loc) => {
+                        setHoveredIssue(loc);
+                        const id = loc ? issueIdByKey[`${loc.pageNumber}-${loc.blockIndex}`] : null;
+                        setHoveredIssueId(id ?? null);
+                      }}
+                      onFocusedIssueConsumed={() => setFocusedIssueOnce(null)}
+                      currentPage={currentPage}
+                      onPageChange={setCurrentPage}
+                    />
+                  ) : (
+                    <div className="flex min-h-[260px] items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+                      投标文件区块加载中...
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-muted/20 shadow-sm">
+                <CardHeader>
+                  <CardTitle>招标依据预览</CardTitle>
+                  <CardDescription>查看招标文件与法律文件原文，便于对照审查依据</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {report.standardDocuments.length > 0 ? (
+                    <>
+                      <Tabs
+                        value={selectedStandardDocId}
+                        onValueChange={(value) => {
+                          setSelectedStandardDocId(value);
+                          setStandardPage(1);
+                        }}
+                      >
+                        <TabsList className="h-auto flex-wrap justify-start">
+                          {report.standardDocuments.map((doc) => (
+                            <TabsTrigger key={doc.id} value={doc.id} className="max-w-[220px]">
+                              <span className="truncate" title={doc.name}>
+                                {getDocTypeLabel(doc.docType)} · {doc.name}
+                              </span>
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                        {report.standardDocuments.map((doc) => (
+                          <TabsContent key={doc.id} value={doc.id} className="mt-4">
+                            {!doc.mimeType.toLowerCase().includes("pdf") ? (
+                              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                                当前仅支持 PDF 在线预览，该文件类型为 {doc.mimeType}
+                              </div>
+                            ) : doc.parseStatus !== "completed" ? (
+                              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                                该文件尚未完成解析，暂时无法展示区块预览
+                              </div>
+                            ) : isStandardPreviewLoading ? (
+                              <div className="flex min-h-[220px] items-center justify-center">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (
+                              <PdfViewer
+                                documentId={doc.id}
+                                blocks={standardBlocks}
+                                highlightedIssues={[]}
+                                currentPage={standardPage}
+                                onPageChange={setStandardPage}
+                              />
+                            )}
+                          </TabsContent>
+                        ))}
+                      </Tabs>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                      当前项目下暂无可预览的招标依据文件
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <IssueLocationViewer
-              issues={report.issues}
-              currentPage={currentPage}
-              onIssueClick={handleLocateClick}
-              onIssueHover={(issue) => {
-                setHoveredIssue(issue?.location ?? null);
-                setHoveredIssueId(issue?.id ?? null);
-              }}
-              hoveredIssueId={hoveredIssueId ?? undefined}
-              issueNoById={issueNoById}
-            />
-            <Card className="shadow-sm bg-muted/20">
-              <CardHeader>
-                <CardTitle>当前页预览</CardTitle>
-                <CardDescription>第 {currentPage} 页内容</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {blocks.length > 0 ? (
-                  <PdfViewer
-                    documentId={report.document.id}
-                    blocks={blocks}
-                    // 保留全量高亮：便于对照（仅左侧列表可切“当前页/全部”）
-                    highlightedIssues={report.issues.map((i) => i.location)}
-                    focusedIssue={focusedIssueOnce}
-                    hoveredIssue={hoveredIssue}
-                    issueNoByKey={issueNoByKey}
-                    onIssueHover={(loc) => {
-                      setHoveredIssue(loc);
-                      const id = loc ? issueIdByKey[`${loc.pageNumber}-${loc.blockIndex}`] : null;
-                      setHoveredIssueId(id ?? null);
-                    }}
-                    onFocusedIssueConsumed={() => setFocusedIssueOnce(null)}
-                    currentPage={currentPage}
-                    onPageChange={handlePageChange}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">加载中...</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+
+          {report.issues.length === 0 &&
+            report.reviewItemResults.length === 0 &&
+            report.responseItemResults.length === 0 && (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <FileSearch className="mb-4 h-12 w-12 text-muted-foreground" />
+                  <h3 className="mb-2 text-lg font-semibold">报告已完成，但暂未生成结构化结果</h3>
+                  <p className="text-center text-muted-foreground">
+                    请检查智能体是否已将审查项结果和响应项结果正确落库
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+        </>
       )}
 
-      {/* 空状态 */}
-      {report.status === "completed" && (!report.issues || report.issues.length === 0) && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">审查完成，未发现问题</h3>
-            <p className="text-muted-foreground text-center">
-              文档符合合规性要求，审查通过
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 待审查状态 */}
       {report.status === "pending" && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">尚未开始审查</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              点击上方「开始审查」按钮，AI 将自动分析文档内容
+            <Clock className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold">尚未开始审查</h3>
+            <p className="mb-4 text-center text-muted-foreground">
+              点击上方“进入审查会话”，AI 将开始分析投标文件
             </p>
           </CardContent>
         </Card>
       )}
 
-      {/* 审查中状态 */}
       {report.status === "in_progress" && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-yellow-500 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">正在分析文档</h3>
-            <p className="text-muted-foreground text-center">
-              AI 正在进行合规性审查，请稍候刷新查看结果...
+            <Loader2 className="mb-4 h-12 w-12 animate-spin text-yellow-500" />
+            <h3 className="mb-2 text-lg font-semibold">正在分析文档</h3>
+            <p className="text-center text-muted-foreground">
+              AI 正在进行结构化审查，请稍后刷新查看结果
             </p>
           </CardContent>
         </Card>
@@ -535,7 +907,7 @@ export default function ReportDetailPage() {
             <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
             <h3 className="mb-2 text-lg font-semibold">审查失败</h3>
             <p className="mb-4 text-center text-muted-foreground">
-              这次审查没有完整落库，请进入审查会话查看过程并重新触发。
+              这次审查没有完整落库，请进入审查会话查看过程并重新触发
             </p>
             <Button onClick={() => router.push(`/reports/${reportId}/chat`)}>
               <Bot className="mr-2 h-4 w-4" />

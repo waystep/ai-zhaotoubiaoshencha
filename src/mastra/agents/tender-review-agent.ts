@@ -1,17 +1,35 @@
 // 招标文件审查 Agent
 // 直接使用 Mastra 内置的 ModelsDevGateway 模型路由
 import { Agent } from "@mastra/core/agent";
-import { documentAnalysisTool } from "../tools/document-analysis-tool";
+import { Memory } from "@mastra/memory";
+import { documentReaderTool } from "../tools/document-reader-tool";
+import { getReviewItemsTool } from "../tools/get-review-items-tool";
+import { resolveReviewReportTool } from "../tools/resolve-review-report-tool";
 import { structuredReviewStorageTool } from "../tools/structured-review-storage-tool";
 import { reviewModelConfig, tenderReviewInstructions } from "../config/review";
+import { pgStore, pgVector } from "../storage";
 
 export const tenderReviewAgent = new Agent({
   id: "tender-review-agent",
   name: "招标文件审查专家",
   instructions: tenderReviewInstructions,
   model: reviewModelConfig.defaultModel,
+  memory: new Memory({
+    storage: pgStore,
+    vector: pgVector,
+    options: {
+      lastMessages: 20,
+      workingMemory: {
+        enabled: true,
+        scope: "resource",
+      },
+      generateTitle: true,
+    },
+  }),
   tools: {
-    documentAnalysisTool,
+    resolveReviewReportTool,
+    getReviewItemsTool,
+    documentReaderTool,
     structuredReviewStorageTool,
   },
 });
