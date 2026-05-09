@@ -340,7 +340,7 @@ function LoginForm() {
                     "登录"
                   )}
                 </Button>
-                <div className="relative">
+                {/* <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-slate-200" />
                   </div>
@@ -396,7 +396,7 @@ function LoginForm() {
                     )}
                     使用 Google 登录
                   </Button>
-                </div>
+                </div> */}
                 <p className="text-center text-sm text-slate-600">
                   还没有账号?{" "}
                   <Link href="/register" className="font-medium text-primary hover:underline">
