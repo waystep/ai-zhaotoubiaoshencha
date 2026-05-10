@@ -4,6 +4,7 @@ import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
 import { documentReaderTool } from "../tools/document-reader-tool";
 import { getReviewItemsTool } from "../tools/get-review-items-tool";
+import { getReportTool } from "../tools/get-report-tool";
 import { resolveReviewReportTool } from "../tools/resolve-review-report-tool";
 import { structuredReviewStorageTool } from "../tools/structured-review-storage-tool";
 import { reviewModelConfig, tenderReviewInstructions } from "../config/review";
@@ -28,6 +29,7 @@ export const tenderReviewAgent = new Agent({
   }),
   tools: {
     resolveReviewReportTool,
+    getReportTool,
     getReviewItemsTool,
     documentReaderTool,
     structuredReviewStorageTool,

@@ -8,6 +8,42 @@ interface RouteContext {
   params: Promise<{ reportId: string }>;
 }
 
+export async function DELETE(request: Request, context: RouteContext) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { reportId } = await context.params;
+
+  try {
+    // 验证报告存在且属于用户组织
+    const report = await db.query.reviewReports.findFirst({
+      where: eq(reviewReports.id, reportId),
+      with: {
+        project: {
+          columns: {
+            id: true,
+            orgId: true,
+          },
+        },
+      },
+    });
+
+    if (!report || report.project?.orgId !== session.user?.orgId) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
+
+    // 删除报告（级联删除会处理 issues、reviewItemResults、responseItemResults）
+    await db.delete(reviewReports).where(eq(reviewReports.id, reportId));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete review report:", error);
+    return NextResponse.json({ error: "Failed to delete review report" }, { status: 500 });
+  }
+}
+
 export async function GET(request: Request, context: RouteContext) {
   const session = await auth();
   if (!session) {

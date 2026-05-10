@@ -7,7 +7,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">设置</h2>
+        <h2 className="text-h2">设置</h2>
         <p className="text-muted-foreground">账户与平台偏好（功能开发中）</p>
       </div>
 

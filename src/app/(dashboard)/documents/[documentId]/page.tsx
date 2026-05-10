@@ -171,7 +171,7 @@ export default function DocumentDetailPage() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">文档不存在</h3>
+          <h3 className="text-h5 mb-2">文档不存在</h3>
           <p className="text-muted-foreground text-center mb-4">
             请检查文档 ID 是否正确
           </p>
@@ -198,7 +198,7 @@ export default function DocumentDetailPage() {
             <ArrowLeft className="h-4 w-4 mr-1" />
             返回文件列表
           </Button>
-          <h2 className="text-3xl font-bold tracking-tight">{document.name}</h2>
+          <h2 className="text-h2">{document.name}</h2>
           <p className="text-muted-foreground">
             {getDocTypeLabel(document.docType)} ·
             上传于 {new Date(document.createdAt).toLocaleDateString("zh-CN")}
@@ -242,7 +242,7 @@ export default function DocumentDetailPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-stat">
               {document.parseStatus === "completed"
                 ? "已解析"
                 : document.parseStatus === "processing"
@@ -269,7 +269,7 @@ export default function DocumentDetailPage() {
                 <CardTitle className="text-sm font-medium">总页数</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{parsedResult.totalPages}</div>
+                <div className="text-stat">{parsedResult.totalPages}</div>
               </CardContent>
             </Card>
 
@@ -278,7 +278,7 @@ export default function DocumentDetailPage() {
                 <CardTitle className="text-sm font-medium">内容区块</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{parsedResult.blocks?.length || 0}</div>
+                <div className="text-stat">{parsedResult.blocks?.length || 0}</div>
               </CardContent>
             </Card>
           </>
@@ -309,7 +309,7 @@ export default function DocumentDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">文档尚未解析</h3>
+            <h3 className="text-h5 mb-2">文档尚未解析</h3>
             <p className="text-muted-foreground text-center mb-4">
               点击上方「开始解析」按钮，使用 MinerU 解析文档内容
             </p>
@@ -322,7 +322,7 @@ export default function DocumentDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-12 w-12 animate-spin text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
+            <h3 className="text-h5 mb-2">
               文档正在解析 · {parseProgressPercent(document.taskProgress)}%
             </h3>
             <div className="mb-4 h-2 w-full max-w-md rounded-full bg-muted overflow-hidden">

@@ -1,17 +1,18 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
+  Bot,
   ClipboardCheck,
-  FolderOpen,
-  BarChart3,
+  FileText,
   LogOut,
-  Settings,
+  Plus,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,19 +20,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
-const navigation = [
-  { name: "项目列表", href: "/projects", icon: FolderOpen },
-  // { name: "文件管理", href: "/documents", icon: FileText },
-  // { name: "审查报告", href: "/reports", icon: ClipboardCheck },
-  { name: "统计分析", href: "/analytics", icon: BarChart3 },
-  { name: "设置", href: "/settings", icon: Settings },
-];
+type ProjectOption = {
+  id: string;
+  name: string;
+  projectNo: string;
+};
+
+type ProjectApiItem = ProjectOption & {
+  [key: string]: unknown;
+};
 
 function navItemIsActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   return href !== "/" && pathname.startsWith(`${href}/`);
+}
+
+function selectedProjectIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/projects\/([^/]+)/);
+  if (!match) return null;
+  if (match[1] === "new") return null;
+  return match[1];
 }
 
 export default function DashboardLayout({
@@ -40,108 +57,220 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
-  const currentNav =
-    navigation.find((item) => navItemIsActive(pathname, item.href)) ?? null;
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+
+  const selectedProjectId = selectedProjectIdFromPath(pathname);
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  );
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchProjects() {
+      try {
+        const response = await fetch("/api/projects");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (ignore) return;
+        setProjects(
+          ((data.projects ?? []) as ProjectApiItem[]).map((project) => ({
+            id: project.id,
+            name: project.name,
+            projectNo: project.projectNo,
+          }))
+        );
+      } catch (error) {
+        console.error("获取项目列表失败:", error);
+      }
+    }
+
+    void fetchProjects();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const projectNavigation = selectedProjectId
+    ? [
+        {
+          name: "文档管理",
+          href: `/projects/${selectedProjectId}/documents`,
+          icon: FileText,
+        },
+        {
+          name: "审查报告",
+          href: `/projects/${selectedProjectId}/reports`,
+          icon: ClipboardCheck,
+        },
+      ]
+    : [];
+
+  const globalNavigation = [
+    {
+      name: "AI 助手",
+      href: "/chat",
+      icon: Bot,
+    },
+  ];
 
   return (
-    <div className="min-h-screen flex bg-background">
-      <aside className="w-64 border-r bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/50 flex flex-col">
-        <div className="p-4 border-b">
-          <Link href="/" className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-muted/50">
-            <ClipboardCheck className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">智能招标审查平台</span>
-          </Link>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-1">
-          {navigation.map((item) => {
-            const isActive = navItemIsActive(pathname, item.href);
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-opacity",
-                    isActive ? "opacity-100" : "opacity-0"
-                  )}
-                  aria-hidden
-                />
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-4 border-t">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-auto py-2"
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={session?.user?.image || ""} />
-                  <AvatarFallback>
-                    {session?.user?.name?.[0] || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col items-start text-left">
-                  <span className="text-sm font-medium">
-                    {session?.user?.name || "User"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {session?.user?.email}
-                  </span>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem asChild>
-                <Link href="/settings">设置</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="text-destructive"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                退出登录
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </aside>
-
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b bg-card/70 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-xs text-muted-foreground">当前位置</div>
-              <div className="truncate text-sm font-medium">
-                {currentNav?.name || "工作台"}
-              </div>
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* 统一的顶部 Header - 全宽 */}
+      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+        <div className="flex items-center gap-4 px-6 h-14">
+          {/* Logo */}
+          <Link href="/projects" className="flex items-center gap-2.5 rounded-lg shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <ClipboardCheck className="h-4 w-4" />
             </div>
+            <span className="text-sm font-semibold">智能招标审查</span>
+          </Link>
+
+          {/* 项目选择器 + 用户信息 - 靠右 */}
+          <div className="flex items-center gap-3 ml-auto">
+            <Select
+              value={selectedProjectId ?? ""}
+              onValueChange={(projectId) => {
+                if (projectId === "__new") {
+                  router.push("/projects/new");
+                  return;
+                }
+                router.push(`/projects/${projectId}/reports`);
+              }}
+            >
+              <SelectTrigger className="h-9 w-[280px] bg-card">
+                <SelectValue placeholder="选择项目" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    <span className="block truncate">{project.name}</span>
+                  </SelectItem>
+                ))}
+                <SelectItem value="__new">创建新项目</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
+                  <Avatar className="h-7 w-7">
+                    <AvatarImage src={session?.user?.image || ""} />
+                    <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <div className="truncate text-sm font-medium">
+                    {session?.user?.name || "User"}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {session?.user?.email}
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">设置</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  退出登录
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </header>
-        {/* scrollbar-gutter: 避免主滚动条显隐时挤占内容宽度，引发 ResizeObserver / PDF 整页重绘闪动 */}
-        <div
-          id="dashboard-scroll"
-          className="min-h-0 flex-1 overflow-auto p-6 [scrollbar-gutter:stable]"
-        >
-          {children}
         </div>
-      </main>
+      </header>
+
+      {/* 下方：Sidebar + Main 并排 */}
+      <div className="flex min-h-0 flex-1">
+        {/* 侧边栏导航 */}
+        <aside className="flex w-56 shrink-0 flex-col border-r bg-card/50">
+          <nav className="flex-1 space-y-1 p-3">
+            {/* 全局导航 */}
+            {globalNavigation.map((item) => {
+              const isActive = navItemIsActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              );
+            })}
+
+            {/* 项目工作区 */}
+            {selectedProjectId && (
+              <>
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                  项目工作区
+                </div>
+                {projectNavigation.map((item) => {
+                  const isActive = navItemIsActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                        isActive
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </>
+            )}
+
+            {!selectedProjectId && pathname !== "/chat" && (
+              <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                请在上方选择项目后进入文档管理和审查报告。
+              </div>
+            )}
+          </nav>
+
+          <div className="border-t p-3">
+            <Link href="/projects/new">
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <Plus className="mr-2 h-4 w-4" />
+                创建项目
+              </Button>
+            </Link>
+          </div>
+        </aside>
+
+        {/* 主内容区域 */}
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div
+            id="dashboard-scroll"
+            className="min-h-0 flex-1 overflow-auto p-4 [scrollbar-gutter:stable]"
+          >
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

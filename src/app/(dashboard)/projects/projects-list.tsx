@@ -144,7 +144,7 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">项目列表</h2>
+          <h2 className="text-h2">项目列表</h2>
           <p className="text-muted-foreground">管理您的招标审查项目</p>
         </div>
         <Link href="/projects/new">
@@ -159,7 +159,7 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">暂无项目</h3>
+            <h3 className="text-h5 mb-2">暂无项目</h3>
             <p className="text-muted-foreground text-center mb-4">
               点击上方按钮创建您的第一个招标审查项目
             </p>

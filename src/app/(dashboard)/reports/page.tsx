@@ -141,7 +141,7 @@ export default function ReportsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">审查报告</h2>
+          <h2 className="text-h2">审查报告</h2>
           <p className="text-muted-foreground">
             查看所有审查报告和问题清单
           </p>
@@ -158,7 +158,7 @@ export default function ReportsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <ClipboardCheck className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">暂无审查报告</h3>
+            <h3 className="text-h5 mb-2">暂无审查报告</h3>
             <p className="text-muted-foreground text-center mb-4">
               请先创建项目并上传文档，然后发起审查任务
             </p>
@@ -202,7 +202,7 @@ export default function ReportsPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     {report.aiScore && (
-                      <div className="text-lg font-semibold text-primary">
+                      <div className="text-h5 text-primary">
                         <span title={`${report.aiScore}分`}>{report.aiScore}分</span>
                       </div>
                     )}

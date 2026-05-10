@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">
+        <h2 className="text-h2">
           欢迎回来，{session.user?.name}
         </h2>
         <p className="text-muted-foreground">
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projectCount}</div>
+            <div className="text-stat">{projectCount}</div>
             <p className="text-xs text-muted-foreground">
               招标审查项目
             </p>
@@ -60,7 +60,7 @@ export default async function DashboardPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-stat">0</div>
             <p className="text-xs text-muted-foreground">
               等待审查的投标文件
             </p>
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-stat">0</div>
             <p className="text-xs text-muted-foreground">
               审查报告已生成
             </p>

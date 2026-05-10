@@ -153,7 +153,7 @@ export default function DocumentsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">文件管理</h2>
+          <h2 className="text-h2">文件管理</h2>
           <p className="text-muted-foreground">
             查看所有项目相关文档
           </p>
@@ -170,7 +170,7 @@ export default function DocumentsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">暂无文档</h3>
+            <h3 className="text-h5 mb-2">暂无文档</h3>
             <p className="text-muted-foreground text-center mb-4">
               请先创建项目并上传文档
             </p>

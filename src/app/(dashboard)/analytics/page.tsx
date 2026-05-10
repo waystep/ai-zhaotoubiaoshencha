@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">统计分析</h2>
+          <h2 className="text-h2">统计分析</h2>
           <p className="text-muted-foreground">
             查看平台使用统计数据
           </p>
@@ -247,7 +247,7 @@ export default function AnalyticsPage() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "--" : overview?.projectsCount ?? 0}</div>
+            <div className="text-stat">{loading ? "--" : overview?.projectsCount ?? 0}</div>
             <p className="text-xs text-muted-foreground">当前组织可见项目数</p>
           </CardContent>
         </Card>
@@ -258,7 +258,7 @@ export default function AnalyticsPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "--" : overview?.documents.total ?? 0}</div>
+            <div className="text-stat">{loading ? "--" : overview?.documents.total ?? 0}</div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
               <Badge variant="outline" className="border-yellow-300 text-yellow-700 bg-yellow-50">
                 解析中 {overview?.documents.processing ?? 0}
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "--" : overview?.reports.total ?? 0}</div>
+            <div className="text-stat">{loading ? "--" : overview?.reports.total ?? 0}</div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
               <Badge variant="outline" className="border-yellow-300 text-yellow-700 bg-yellow-50">
                 进行中 {overview?.reports.in_progress ?? 0}
@@ -297,7 +297,7 @@ export default function AnalyticsPage() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "--" : avgScoreLabel}</div>
+            <div className="text-stat">{loading ? "--" : avgScoreLabel}</div>
             <p className="text-xs text-muted-foreground">已完成报告 aiScore 平均值</p>
           </CardContent>
         </Card>

@@ -1,18 +1,25 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ClipboardCheck, Loader2, Plus, CheckCircle, Clock, ArrowLeft } from "lucide-react";
+import { ClipboardCheck, Loader2, Plus, CheckCircle, Clock, Trash2, Check, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { TruncatedText } from "@/components/ui/truncated-text";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { docTypeLabel, reviewStatusLabel } from "@/lib/ui/labels";
 import { formatDateCN } from "@/lib/ui/format";
 import { useDashboardScrollRestoration } from "@/hooks/use-dashboard-scroll-restoration";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface Report {
   id: string;
@@ -28,9 +35,50 @@ interface Report {
   };
 }
 
+function SelectionBox({
+  checked,
+  indeterminate,
+  disabled,
+  onClick,
+  ariaLabel,
+  className,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  ariaLabel: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-label={ariaLabel}
+      aria-checked={indeterminate ? "mixed" : checked}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        checked || indeterminate
+          ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+          : "border-input bg-background text-transparent hover:border-primary/60 hover:bg-primary/5",
+        disabled && "cursor-not-allowed opacity-40 hover:border-input hover:bg-background",
+        className
+      )}
+    >
+      {indeterminate ? (
+        <Minus className="h-3 w-3 stroke-[3]" />
+      ) : checked ? (
+        <Check className="h-3 w-3 stroke-[3]" />
+      ) : null}
+    </button>
+  );
+}
+
 export default function ProjectReportsPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params.projectId as string;
   const { toast } = useToast();
 
@@ -38,6 +86,9 @@ export default function ProjectReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("");
+  const [deletingIds, setDeletingIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
   const { saveNow } = useDashboardScrollRestoration(`project-reports:${projectId}?q=${q}&status=${status}`);
 
   useEffect(() => {
@@ -82,6 +133,122 @@ export default function ProjectReportsPage() {
     }
   };
 
+  async function handleDelete(reportId: string, documentName: string) {
+    if (!confirm(`确定要删除审查报告 "${documentName}" 吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    setDeletingIds((prev) => [...prev, reportId]);
+    try {
+      const response = await fetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast({
+          title: "删除成功",
+          description: "审查报告已删除",
+        });
+        setReports((prev) => prev.filter((r) => r.id !== reportId));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(reportId);
+          return next;
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "删除失败",
+          description: error.error || "删除审查报告失败",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "请检查您的网络连接",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingIds((prev) => prev.filter((id) => id !== reportId));
+    }
+  }
+
+  async function handleBatchDelete() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) {
+      toast({
+        title: "无法删除",
+        description: "请先选择要删除的审查报告",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!confirm(`确定删除已选的 ${ids.length} 个审查报告？此操作不可撤销。`)) {
+      return;
+    }
+
+    setBatchBusy(true);
+    let ok = 0;
+    const failed: string[] = [];
+    for (const id of ids) {
+      const report = reports.find((r) => r.id === id);
+      try {
+        const response = await fetch(`/api/reports/${id}`, { method: "DELETE" });
+        if (response.ok) {
+          ok += 1;
+          setReports((prev) => prev.filter((r) => r.id !== id));
+        } else {
+          const err = await response.json().catch(() => ({}));
+          failed.push(`${report?.document.name ?? id}: ${err.error || "失败"}`);
+        }
+      } catch {
+        failed.push(`${report?.document.name ?? id}: 网络错误`);
+      }
+    }
+    setSelectedIds(new Set());
+    setBatchBusy(false);
+    if (ok > 0) {
+      toast({
+        title: "批量删除完成",
+        description:
+          failed.length === 0
+            ? `已删除 ${ok} 个审查报告`
+            : `已删除 ${ok} 个；${failed.length} 个失败`,
+      });
+    }
+    if (failed.length > 0 && ok === 0) {
+      toast({
+        title: "删除失败",
+        description: failed.slice(0, 3).join("；"),
+        variant: "destructive",
+      });
+    } else if (failed.length > 0) {
+      toast({
+        title: "部分删除失败",
+        description: failed.slice(0, 3).join("；"),
+        variant: "destructive",
+      });
+    }
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((r) => r.id)));
+    }
+  }
+
+  function toggleRow(reportId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(reportId)) next.delete(reportId);
+      else next.add(reportId);
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return reports.filter((r) => {
@@ -90,6 +257,20 @@ export default function ProjectReportsPage() {
       return r.document.name.toLowerCase().includes(query);
     });
   }, [reports, q, status]);
+
+  const allSelected = filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
+  const someSelected = selectedIds.size > 0;
+  const batchDeletableCount = selectedIds.size;
+
+  // Clear selection when filters change
+  useEffect(() => {
+    const visible = new Set(filtered.map((r) => r.id));
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => visible.has(id)));
+      if (next.size === prev.size && [...next].every((id) => prev.has(id))) return prev;
+      return next;
+    });
+  }, [filtered]);
 
   const chips: Array<{ key: string; label: string; onRemove: () => void }> = [];
   if (status) {
@@ -116,145 +297,253 @@ export default function ProjectReportsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* 吸顶筛选条 */}
-      <div className="sticky top-0 z-10 -mx-6 border-b bg-background/85 px-6 py-4 backdrop-blur">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <div className="flex-1 min-w-0">
-            <label className="text-sm text-muted-foreground">搜索（文档名）</label>
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="输入关键词…" />
-          </div>
-          <div className="w-full md:w-[200px]">
-            <label className="text-sm text-muted-foreground">审查状态</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="">全部</option>
-              <option value="in_progress">审查中</option>
-              <option value="completed">已完成</option>
-              <option value="pending">待审查</option>
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
+    <div className="space-y-4">
+      {/* 紧凑筛选条 */}
+      <div className="sticky top-0 z-10 -mx-6 border-b bg-background/95 backdrop-blur px-6 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="搜索文档名..."
+            className="h-9 w-[200px]"
+          />
+          <Select
+            value={status || "all"}
+            onValueChange={(v) => setStatus(v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="h-9 w-[140px]">
+              <SelectValue placeholder="全部状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="in_progress">审查中</SelectItem>
+              <SelectItem value="completed">已完成</SelectItem>
+              <SelectItem value="pending">待审查</SelectItem>
+            </SelectContent>
+          </Select>
+          {(q || status) && (
+            <button
+              type="button"
               onClick={() => {
                 setQ("");
                 setStatus("");
               }}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              清空
-            </Button>
+              清空筛选
+            </button>
+          )}
+
+          {/* 创建审查任务按钮 - 固定右侧 */}
+          <div className="ml-auto shrink-0">
+            <Link href={`/projects/${projectId}/reports/new`} title="从已解析文档发起新的审查流程">
+              <Button size="sm">
+                <Plus className="mr-1.5 h-4 w-4" />
+                创建审查任务
+              </Button>
+            </Link>
           </div>
         </div>
 
         {chips.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mt-2">
             {chips.map((c) => (
               <button
                 key={c.key}
                 type="button"
                 onClick={c.onRemove}
-                className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs hover:bg-muted"
+                className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-0.5 text-xs hover:bg-muted"
                 title="点击移除筛选"
               >
                 <span className="truncate">{c.label}</span>
                 <span className="text-muted-foreground">×</span>
               </button>
             ))}
+            {reports.some((r) => r.status === "in_progress") && (
+              <Badge variant="outline" className="text-xs" title="审查中会自动刷新">
+                自动刷新中
+              </Badge>
+            )}
           </div>
         )}
       </div>
 
-      {/* 头部 */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
-            onClick={() => router.push(`/projects/${projectId}`)}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            返回项目详情
-          </Button>
-          <h2 className="text-3xl font-bold tracking-tight">审查报告</h2>
-          <p className="text-muted-foreground">
-            查看和管理项目的审查报告
-          </p>
-        </div>
-        <Link href={`/projects/${projectId}/reports/new`} className="shrink-0">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            创建审查任务
-          </Button>
-        </Link>
-      </div>
-
-      {/* 报告列表 */}
-      {reports.length === 0 ? (
+      {/* 内容区 */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      ) : reports.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <ClipboardCheck className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">暂无审查报告</h3>
+            <h3 className="text-h5 mb-2">暂无审查报告</h3>
             <p className="text-muted-foreground text-center mb-4">
               创建审查任务，对已解析的文档进行合规性审查
             </p>
             <Link href={`/projects/${projectId}/reports/new`}>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="sm">
+                <Plus className="mr-1.5 h-4 w-4" />
                 创建审查任务
               </Button>
             </Link>
           </CardContent>
         </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            当前筛选条件下没有审查报告
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4">
-          <div className="text-sm text-muted-foreground">共 {filtered.length} 条</div>
-          {filtered.map((report) => (
-            <Link
-              key={report.id}
-              href={`/reports/${report.id}`}
-              className="block"
-              onClick={() => saveNow()}
+        <>
+          {/* 批量操作栏 - 紧凑样式 */}
+          <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <SelectionBox
+                checked={allSelected}
+                indeterminate={someSelected && !allSelected}
+                onClick={toggleSelectAll}
+                disabled={batchBusy || filtered.length === 0}
+                ariaLabel="选择全部报告"
+              />
+              <span className="font-medium">全选</span>
+              <span className="text-muted-foreground text-xs">
+                {selectedIds.size}/{filtered.length}
+              </span>
+            </label>
+
+            <div className="h-4 w-px bg-border" />
+
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={batchBusy || batchDeletableCount === 0}
+              onClick={handleBatchDelete}
+              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
             >
-              <Card className="hover:border-primary transition-colors cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <div className="flex items-center gap-4">
-                    {getStatusIcon(report.status)}
-                    <div>
-                      <CardTitle className="text-base">
-                        <TruncatedText text={report.document.name} />
-                      </CardTitle>
-                      <CardDescription>
-                        {docTypeLabel(report.document.docType)} ·
-                        {formatDateCN(report.createdAt)}
-                      </CardDescription>
+              {batchBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : `批量删除 (${batchDeletableCount})`}
+            </Button>
+
+            <div className="ml-auto text-xs text-muted-foreground">
+              共 {filtered.length} 条
+            </div>
+          </div>
+
+          {/* 表格样式报告列表 */}
+          <div className="rounded-lg border overflow-hidden">
+            {/* 表头 */}
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-4 bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground border-b">
+              <div className="w-4" />
+              <div>文档名称</div>
+              <div className="w-[100px] text-center">类型</div>
+              <div className="w-[80px] text-center">评分</div>
+              <div className="w-[100px] text-center">建议</div>
+              <div className="w-[80px] text-center">状态</div>
+              <div className="w-[60px] text-center">操作</div>
+            </div>
+
+            {/* 表格内容 */}
+            <div className="divide-y">
+              {filtered.map((report) => {
+                const isSelected = selectedIds.has(report.id);
+                const rec = getRecommendationLabel(report.recommendation);
+
+                return (
+                  <div
+                    key={report.id}
+                    className={cn(
+                      "grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors",
+                      isSelected && "bg-primary/5"
+                    )}
+                  >
+                    {/* 选择框 */}
+                    <SelectionBox
+                      checked={isSelected}
+                      disabled={batchBusy || deletingIds.includes(report.id)}
+                      onClick={() => toggleRow(report.id)}
+                      ariaLabel={`选择 ${report.document.name}`}
+                    />
+
+                    {/* 文档名称 */}
+                    <Link
+                      href={`/reports/${report.id}`}
+                      onClick={() => saveNow()}
+                      className="flex items-center gap-3 min-w-0 group"
+                    >
+                      {getStatusIcon(report.status)}
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                          {report.document.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDateCN(report.createdAt)}
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* 类型 */}
+                    <div className="w-[100px] text-center">
+                      <Badge variant="outline" className="text-xs">
+                        {docTypeLabel(report.document.docType)}
+                      </Badge>
+                    </div>
+
+                    {/* 评分 */}
+                    <div className="w-[80px] text-center">
+                      {report.aiScore ? (
+                        <span className="text-sm font-medium text-primary">{report.aiScore}分</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </div>
+
+                    {/* 建议 */}
+                    <div className="w-[100px] text-center">
+                      {rec ? (
+                        <Badge className={cn("text-xs", rec.color)}>
+                          {rec.label}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </div>
+
+                    {/* 状态 */}
+                    <div className="w-[80px] flex items-center justify-center">
+                      <Badge variant="outline" className="text-xs">
+                        {reviewStatusLabel(report.status)}
+                      </Badge>
+                    </div>
+
+                    {/* 操作 */}
+                    <div className="w-[60px] flex items-center justify-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(report.id, report.document.name);
+                        }}
+                        disabled={deletingIds.includes(report.id) || batchBusy}
+                        className="h-7 px-1.5 text-destructive hover:text-destructive"
+                      >
+                        {deletingIds.includes(report.id) ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    {report.aiScore && (
-                      <div className="text-lg font-bold text-primary">
-                        <span title={`${report.aiScore}分`}>{report.aiScore}分</span>
-                      </div>
-                    )}
-                    {report.recommendation && (
-                      <Badge className={getRecommendationLabel(report.recommendation)?.color}>
-                        {getRecommendationLabel(report.recommendation)?.label}
-                      </Badge>
-                    )}
-                    <Badge variant="outline">
-                      {reviewStatusLabel(report.status)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

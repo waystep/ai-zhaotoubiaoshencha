@@ -80,7 +80,7 @@ export default function NewProjectPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回项目列表
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight">创建新项目</h2>
+        <h2 className="text-h2">创建新项目</h2>
         <p className="text-muted-foreground">
           填写项目信息，创建招标审查项目
         </p>

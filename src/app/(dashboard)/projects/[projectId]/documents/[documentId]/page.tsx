@@ -498,7 +498,7 @@ export default function DocumentDetailPage() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
-          <h3 className="mb-2 text-lg font-semibold">文档不存在</h3>
+          <h3 className="mb-2 text-h5">文档不存在</h3>
           <Button onClick={() => router.push(`/projects/${projectId}`)}>返回项目详情</Button>
         </CardContent>
       </Card>
@@ -609,7 +609,7 @@ export default function DocumentDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clock className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">文档待解析</h3>
+            <h3 className="mb-2 text-h5">文档待解析</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
               解析完成后可查看源文件、区块详情、全文 Markdown 与提取信息。
             </p>
@@ -625,7 +625,7 @@ export default function DocumentDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="mb-4 h-12 w-12 animate-spin text-muted-foreground" />
-            <h3 className="mb-3 text-lg font-semibold">
+            <h3 className="mb-3 text-h5">
               文档正在解析 · {parseProgressPercent(document.taskProgress)}%
             </h3>
             <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-muted">
@@ -714,11 +714,11 @@ export default function DocumentDetailPage() {
                     <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-md bg-muted/50 p-2">
                         <div className="text-muted-foreground">应答项</div>
-                        <div className="text-lg font-semibold">{extractionResult.responseItems.length}</div>
+                        <div className="text-h5">{extractionResult.responseItems.length}</div>
                       </div>
                       <div className="rounded-md bg-muted/50 p-2">
                         <div className="text-muted-foreground">审查项</div>
-                        <div className="text-lg font-semibold">{extractionResult.reviewItems.length}</div>
+                        <div className="text-h5">{extractionResult.reviewItems.length}</div>
                       </div>
                     </div>
                     {totalExtracted === 0 ? (

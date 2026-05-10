@@ -206,21 +206,40 @@ export const reportGenerationInstructions = `
 
 工作要求：
 1. 汇总 content-review-agent、image-review-agent 等结果，形成统一的结构化审查报告。
-2. 只将真实问题写入 issues[]；reviewItemResults / responseItemResults 作为条目级明细单独保存。
-3. 输出必须包含：
-   - summary
-   - score
-   - recommendation(pass/revise/fail)
-   - issues[]
-   - reviewItemResults[]
-   - responseItemResults[]
-4. 使用 structuredReviewStorageTool 一次性保存：
-   - review_reports 的 summary/score/recommendation/aiAnalysis/status
-   - review_issues
-   - review_item_results
-   - response_item_results
-5. 成功落库后将报告状态设为 completed；失败时设为 failed。
-6. 不要使用正则抠 JSON；结果必须是干净、明确、可解析的结构。
+2. 只将真实问题写入 issues；reviewItemResults / responseItemResults 作为条目级明细单独保存。
+3. 使用 structuredReviewStorageTool 保存结果，参数格式必须是纯 JSON（不要用 Markdown 或字符串包裹）。
+
+调用 structuredReviewStorageTool 时，参数示例：
+{
+  "reportId": "实际报告UUID",
+  "score": 85,
+  "recommendation": "pass",
+  "summary": "审查摘要文本",
+  "issues": [
+    {
+      "category": "资质要求",
+      "severity": "major",
+      "title": "问题标题",
+      "description": "问题描述",
+      "location": { "pageNumber": 1, "blockIndex": 0 }
+    }
+  ],
+  "reviewItemResults": [
+    { "reviewItemId": "1", "status": "pass", "reason": "通过原因" },
+    { "reviewItemId": "2", "status": "fail", "reason": "失败原因" }
+  ],
+  "responseItemResults": [
+    { "responseItemId": "1", "status": "answered", "reason": "已响应" }
+  ]
+}
+
+关键规则：
+- issues 必须是 JSON 数组，不要用字符串包裹
+- reviewItemResults 必须是 JSON 数组，不要用字符串包裹
+- responseItemResults 必须是 JSON 数组，不要用字符串包裹
+- reviewItemId 可以使用序号（如 "1", "2"）代替 UUID，工具会自动映射
+- status 可选值：pass / fail / needs_manual_review / not_applicable
+- 成功落库后报告状态自动设为 completed
 `;
 
 export const supervisorInstructions = `
@@ -244,8 +263,15 @@ Step 5. 若存在图像类 blocks，可委托 image-review-agent 做补充审查
 Step 6. 委托 report-generation-agent 汇总全部结果并调用结构化存储工具落库。
 Step 7. 确认 report 状态更新为 completed；若关键步骤失败，则更新为 failed。
 
-委托要求：
-1. 委托任何子智能体时，必须显式传递 reportId、projectId、documentId、docType；不要只依赖 memory 共享 report 信息。
-2. 如果存在 reviewItems / responseItems，要一并传递，或明确要求子智能体先通过工具读取。
-3. 最终返回的文字结论应简洁，数据库才是最终事实来源。
+委托要求（核心优化）：
+1. 委托子智能体时，只传递最小化ID信息：reportId、projectId、documentId、docType。
+2. 不要传递完整文档内容、blocks列表或审查项列表——让子智能体通过工具自行获取。
+3. 大文档（>50页）时，明确指定分页参数：如 "请审查第1-30页，使用 startPage=1, endPage=30"。
+4. 子智能体应使用以下工具获取数据：
+   - getReportTool(reportId) 获取报告上下文
+   - documentReaderTool(projectId, documentId, startPage, endPage) 获取分页文档内容
+   - getReviewItemsTool(projectId) 获取审查项
+   - getResponseItemsTool(projectId) 获取响应项
+5. 如果存在 reviewItems / responseItems 的变化，明确要求子智能体重新查询最新数据。
+6. 最终返回的文字结论应简洁，数据库才是最终事实来源。
 `;

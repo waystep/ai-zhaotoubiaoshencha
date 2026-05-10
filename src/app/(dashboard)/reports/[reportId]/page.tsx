@@ -16,6 +16,7 @@ import {
   FileText,
   Loader2,
   MapPin,
+  Trash2,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -260,6 +261,7 @@ export default function ReportDetailPage() {
   const [hoveredIssue, setHoveredIssue] = useState<IssueLocation | null>(null);
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [selectedStandardDocId, setSelectedStandardDocId] = useState<string>("");
   const [standardBlocks, setStandardBlocks] = useState<DocumentBlock[]>([]);
@@ -319,6 +321,43 @@ export default function ReportDetailPage() {
     },
     [fetchBlocks]
   );
+
+  async function handleDelete() {
+    if (!report) return;
+    if (!confirm(`确定要删除审查报告 "${report.document.name}" 吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/reports/${reportId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast({
+          title: "删除成功",
+          description: "审查报告已删除",
+        });
+        router.push(`/projects/${report.project.id}/reports`);
+      } else {
+        const error = await response.json();
+        toast({
+          title: "删除失败",
+          description: error.error || "删除审查报告失败",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "网络错误",
+        description: "请检查您的网络连接",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   useEffect(() => {
     void fetchReport();
@@ -458,7 +497,7 @@ export default function ReportDetailPage() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
-          <h3 className="mb-2 text-lg font-semibold">报告不存在</h3>
+          <h3 className="mb-2 text-h5">报告不存在</h3>
           <p className="mb-4 text-center text-muted-foreground">请检查报告 ID 是否正确</p>
           <Button variant="outline" onClick={() => router.push("/projects")}>
             返回项目列表
@@ -479,7 +518,7 @@ export default function ReportDetailPage() {
             <ArrowLeft className="mr-1 h-4 w-4" />
             返回项目详情
           </Link>
-          <h2 className="text-3xl font-bold tracking-tight">审查报告</h2>
+          <h2 className="text-h2">审查报告</h2>
           <p className="text-muted-foreground">
             项目: {report.project.name} ({report.project.projectNo})
           </p>
@@ -499,6 +538,19 @@ export default function ReportDetailPage() {
               导出报告
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            {isDeleting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-4 w-4" />
+            )}
+            删除报告
+          </Button>
         </div>
       </div>
 
@@ -509,7 +561,7 @@ export default function ReportDetailPage() {
             {getStatusIcon(report.status)}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{getStatusLabel(report.status)}</div>
+            <div className="text-stat">{getStatusLabel(report.status)}</div>
           </CardContent>
         </Card>
 
@@ -519,7 +571,7 @@ export default function ReportDetailPage() {
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{report.aiScore ? `${report.aiScore} 分` : "--"}</div>
+            <div className="text-stat">{report.aiScore ? `${report.aiScore} 分` : "--"}</div>
           </CardContent>
         </Card>
 
@@ -529,7 +581,7 @@ export default function ReportDetailPage() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{report.issues?.length || 0}</div>
+            <div className="text-stat">{report.issues?.length || 0}</div>
           </CardContent>
         </Card>
 
@@ -539,7 +591,7 @@ export default function ReportDetailPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="truncate text-lg font-semibold" title={report.document.name}>
+            <div className="truncate text-h4" title={report.document.name}>
               {report.document.name}
             </div>
             <p className="text-xs text-muted-foreground">{getDocTypeLabel(report.document.docType)}</p>
@@ -867,7 +919,7 @@ export default function ReportDetailPage() {
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <FileSearch className="mb-4 h-12 w-12 text-muted-foreground" />
-                  <h3 className="mb-2 text-lg font-semibold">报告已完成，但暂未生成结构化结果</h3>
+                  <h3 className="mb-2 text-h5">报告已完成，但暂未生成结构化结果</h3>
                   <p className="text-center text-muted-foreground">
                     请检查智能体是否已将审查项结果和响应项结果正确落库
                   </p>
@@ -881,7 +933,7 @@ export default function ReportDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clock className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">尚未开始审查</h3>
+            <h3 className="mb-2 text-h5">尚未开始审查</h3>
             <p className="mb-4 text-center text-muted-foreground">
               点击上方“进入审查会话”，AI 将开始分析投标文件
             </p>
@@ -893,7 +945,7 @@ export default function ReportDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="mb-4 h-12 w-12 animate-spin text-yellow-500" />
-            <h3 className="mb-2 text-lg font-semibold">正在分析文档</h3>
+            <h3 className="mb-2 text-h5">正在分析文档</h3>
             <p className="text-center text-muted-foreground">
               AI 正在进行结构化审查，请稍后刷新查看结果
             </p>
@@ -905,7 +957,7 @@ export default function ReportDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
-            <h3 className="mb-2 text-lg font-semibold">审查失败</h3>
+            <h3 className="mb-2 text-h5">审查失败</h3>
             <p className="mb-4 text-center text-muted-foreground">
               这次审查没有完整落库，请进入审查会话查看过程并重新触发
             </p>

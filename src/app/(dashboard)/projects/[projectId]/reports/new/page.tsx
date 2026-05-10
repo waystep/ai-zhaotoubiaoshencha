@@ -152,7 +152,7 @@ export default function NewReportPage() {
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回项目详情
         </Button>
-        <h2 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+        <h2 className="text-h2 flex items-center gap-3">
           <Bot className="h-8 w-8 text-primary" />
           AI 智能审查
         </h2>
@@ -249,30 +249,7 @@ export default function NewReportPage() {
                     ))}
                   </div>
 
-                  {/* 其他文件 */}
-                  {documents.filter(d => d.docType !== "bid_doc").length > 0 && (
-                    <div className="space-y-2 mb-4">
-                      <p className="text-sm font-medium text-muted-foreground">其他文件</p>
-                      {documents.filter(d => d.docType !== "bid_doc").map((doc) => (
-                        <div
-                          key={doc.id}
-                          className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                            selectedDoc === doc.id
-                              ? "border-primary bg-primary/5"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                          onClick={() => setSelectedDoc(doc.id)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm">{doc.name}</p>
-                            <Badge variant="outline">{getDocTypeLabel(doc.docType)}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
+                  
                   <div className="flex gap-4 pt-4">
                     <Button
                       onClick={handleStartReview}

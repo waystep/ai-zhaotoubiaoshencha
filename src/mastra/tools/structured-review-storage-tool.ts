@@ -7,6 +7,8 @@ import {
   responseItemResults,
   reviewIssues,
   reviewItemResults,
+  reviewItems,
+  responseItems,
   reviewReports,
 } from "@/lib/db/schema";
 
@@ -26,7 +28,7 @@ const locationSchema = z.object({
 });
 
 const issueSchema = z.object({
-  blockId: z.string().uuid().optional(),
+  blockId: z.string().optional(),
   checkpointId: z.string().optional(),
   category: z.string(),
   severity: z.enum(["critical", "major", "minor", "suggestion"]),
@@ -38,42 +40,110 @@ const issueSchema = z.object({
 });
 
 const reviewItemResultSchema = z.object({
-  reviewItemId: z.string().uuid(),
-  status: z.enum(["pass", "fail", "needs_manual_review"]),
+  reviewItemId: z.string(),
+  status: z.enum(["pass", "fail", "needs_manual_review", "not_applicable"]),
   reason: z.string(),
-  evidenceBlockIds: z.array(z.string().uuid()).default([]),
+  evidenceBlockIds: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const responseItemResultSchema = z.object({
-  responseItemId: z.string().uuid(),
-  status: z.enum(["answered", "partially_answered", "unanswered", "not_applicable"]),
+  responseItemId: z.string(),
+  status: z.enum(["answered", "partially_answered", "unanswered", "not_applicable", "needs_manual_review"]),
   reason: z.string(),
-  evidenceBlockIds: z.array(z.string().uuid()).default([]),
+  evidenceBlockIds: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-function ensureUuid(value?: string | null) {
-  if (!value) return null;
-  return /^[0-9a-f-]{36}$/i.test(value) ? value : null;
+function isValidUuid(value?: string | null): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-async function filterExistingBlockIds(blockIds: string[]) {
-  if (blockIds.length === 0) return new Set<string>();
+function ensureUuid(value?: string | null): string | null {
+  if (!value || !isValidUuid(value)) return null;
+  return value;
+}
+
+async function filterExistingBlockIds(blockIds: string[]): Promise<Set<string>> {
+  const validUuids = blockIds.filter(isValidUuid);
+  if (validUuids.length === 0) return new Set<string>();
 
   const rows = await db.query.documentBlocks.findMany({
-    where: inArray(documentBlocks.id, blockIds),
+    where: inArray(documentBlocks.id, validUuids),
     columns: { id: true },
   });
 
   return new Set(rows.map((row) => row.id));
 }
 
+async function resolveReviewItemIds(projectId: string, inputIds: string[]): Promise<Map<string, string>> {
+  const mapping = new Map<string, string>();
+
+  // 获取项目所有审查项
+  const items = await db.query.reviewItems.findMany({
+    where: eq(reviewItems.projectId, projectId),
+    columns: { id: true, checkpointName: true },
+  });
+
+  for (const inputId of inputIds) {
+    // 如果已经是有效 UUID，直接使用
+    if (isValidUuid(inputId)) {
+      const exists = items.some((item) => item.id === inputId);
+      if (exists) mapping.set(inputId, inputId);
+      continue;
+    }
+
+    // 尝试按序号匹配（如 "1", "2", "review-item-1"）
+    const numMatch = inputId.match(/\d+/);
+    if (numMatch) {
+      const index = parseInt(numMatch[0], 10) - 1;
+      if (index >= 0 && index < items.length) {
+        mapping.set(inputId, items[index].id);
+        continue;
+      }
+    }
+  }
+
+  return mapping;
+}
+
+async function resolveResponseItemIds(projectId: string, inputIds: string[]): Promise<Map<string, string>> {
+  const mapping = new Map<string, string>();
+
+  // 获取项目所有响应项
+  const items = await db.query.responseItems.findMany({
+    where: eq(responseItems.projectId, projectId),
+    columns: { id: true, itemName: true },
+  });
+
+  for (const inputId of inputIds) {
+    // 如果已经是有效 UUID，直接使用
+    if (isValidUuid(inputId)) {
+      const exists = items.some((item) => item.id === inputId);
+      if (exists) mapping.set(inputId, inputId);
+      continue;
+    }
+
+    // 尝试按序号匹配（如 "1", "2", "response-item-1"）
+    const numMatch = inputId.match(/\d+/);
+    if (numMatch) {
+      const index = parseInt(numMatch[0], 10) - 1;
+      if (index >= 0 && index < items.length) {
+        mapping.set(inputId, items[index].id);
+        continue;
+      }
+    }
+  }
+
+  return mapping;
+}
+
 export const structuredReviewStorageTool = createTool({
   id: "structured-review-storage",
-  description: "保存结构化审查结果，写入 report 摘要、问题项、review item results、response item results，并更新 report 状态。",
+  description: "保存结构化审查结果，写入 report 摘要、问题项、review item results、response item results，并更新 report 状态。reviewItemId 和 responseItemId 可以使用真实UUID或序号（如 '1', '2'），工具会自动映射。",
   inputSchema: z.object({
     reportId: z.string().uuid(),
     score: z.number().min(0).max(100),
@@ -107,17 +177,30 @@ export const structuredReviewStorageTool = createTool({
     try {
       const report = await db.query.reviewReports.findFirst({
         where: eq(reviewReports.id, reportId),
-        columns: { id: true, documentId: true },
+        columns: { id: true, documentId: true, projectId: true },
       });
 
       if (!report) {
         throw new Error("报告不存在");
       }
 
+      const projectId = report.projectId;
+
+      // 解析审查项ID和响应项ID
+      const reviewItemIdMapping = await resolveReviewItemIds(
+        projectId,
+        reviewResults.map((r) => r.reviewItemId),
+      );
+
+      const responseItemIdMapping = await resolveResponseItemIds(
+        projectId,
+        responseResults.map((r) => r.responseItemId),
+      );
+
+      // 过滤有效的 block IDs
       const requestedBlockIds = new Set<string>();
       for (const issue of issues) {
-        const blockId = ensureUuid(issue.blockId);
-        if (blockId) requestedBlockIds.add(blockId);
+        if (issue.blockId) requestedBlockIds.add(issue.blockId);
       }
       for (const result of reviewResults) {
         (result.evidenceBlockIds ?? []).forEach((id) => requestedBlockIds.add(id));
@@ -128,10 +211,12 @@ export const structuredReviewStorageTool = createTool({
 
       const validBlockIds = await filterExistingBlockIds([...requestedBlockIds]);
 
+      // 清理旧数据
       await db.delete(reviewIssues).where(eq(reviewIssues.reportId, reportId));
       await db.delete(reviewItemResults).where(eq(reviewItemResults.reportId, reportId));
       await db.delete(responseItemResults).where(eq(responseItemResults.reportId, reportId));
 
+      // 保存问题
       if (issues.length > 0) {
         await db.insert(reviewIssues).values(
           issues.map((issue) => ({
@@ -150,11 +235,16 @@ export const structuredReviewStorageTool = createTool({
         );
       }
 
-      if (reviewResults.length > 0) {
+      // 保存审查项结果（过滤掉无法映射的ID）
+      const validReviewResults = reviewResults.filter((result) =>
+        reviewItemIdMapping.has(result.reviewItemId),
+      );
+
+      if (validReviewResults.length > 0) {
         await db.insert(reviewItemResults).values(
-          reviewResults.map((result) => ({
+          validReviewResults.map((result) => ({
             reportId,
-            reviewItemId: result.reviewItemId,
+            reviewItemId: reviewItemIdMapping.get(result.reviewItemId)!,
             status: result.status,
             reason: result.reason,
             evidenceBlockIds: (result.evidenceBlockIds ?? []).filter((id) => validBlockIds.has(id)),
@@ -164,11 +254,16 @@ export const structuredReviewStorageTool = createTool({
         );
       }
 
-      if (responseResults.length > 0) {
+      // 保存响应项结果（过滤掉无法映射的ID）
+      const validResponseResults = responseResults.filter((result) =>
+        responseItemIdMapping.has(result.responseItemId),
+      );
+
+      if (validResponseResults.length > 0) {
         await db.insert(responseItemResults).values(
-          responseResults.map((result) => ({
+          validResponseResults.map((result) => ({
             reportId,
-            responseItemId: result.responseItemId,
+            responseItemId: responseItemIdMapping.get(result.responseItemId)!,
             status: result.status,
             reason: result.reason,
             evidenceBlockIds: (result.evidenceBlockIds ?? []).filter((id) => validBlockIds.has(id)),
@@ -178,21 +273,24 @@ export const structuredReviewStorageTool = createTool({
         );
       }
 
+      // 统计摘要
       const reviewItemsSummary = {
-        total: reviewResults.length,
-        pass: reviewResults.filter((item) => item.status === "pass").length,
-        fail: reviewResults.filter((item) => item.status === "fail").length,
-        needsManualReview: reviewResults.filter((item) => item.status === "needs_manual_review").length,
+        total: validReviewResults.length,
+        pass: validReviewResults.filter((item) => item.status === "pass").length,
+        fail: validReviewResults.filter((item) => item.status === "fail").length,
+        needsManualReview: validReviewResults.filter((item) => item.status === "needs_manual_review").length,
+        notApplicable: validReviewResults.filter((item) => item.status === "not_applicable").length,
       };
 
       const responseCoverageSummary = {
-        total: responseResults.length,
-        answered: responseResults.filter((item) => item.status === "answered").length,
-        partiallyAnswered: responseResults.filter((item) => item.status === "partially_answered").length,
-        unanswered: responseResults.filter((item) => item.status === "unanswered").length,
-        notApplicable: responseResults.filter((item) => item.status === "not_applicable").length,
+        total: validResponseResults.length,
+        answered: validResponseResults.filter((item) => item.status === "answered").length,
+        partiallyAnswered: validResponseResults.filter((item) => item.status === "partially_answered").length,
+        unanswered: validResponseResults.filter((item) => item.status === "unanswered").length,
+        notApplicable: validResponseResults.filter((item) => item.status === "not_applicable").length,
       };
 
+      // 更新报告状态
       await db
         .update(reviewReports)
         .set({
@@ -215,9 +313,9 @@ export const structuredReviewStorageTool = createTool({
         success: true,
         reportId,
         issueCount: issues.length,
-        reviewItemResultCount: reviewResults.length,
-        responseItemResultCount: responseResults.length,
-        message: "结构化审查结果已保存",
+        reviewItemResultCount: validReviewResults.length,
+        responseItemResultCount: validResponseResults.length,
+        message: `结构化审查结果已保存：${issues.length}个问题，${validReviewResults.length}个审查项结果，${validResponseResults.length}个响应项结果`,
       };
     } catch (error) {
       await db

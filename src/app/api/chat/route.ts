@@ -8,7 +8,7 @@ import { reviewReports } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { mastra } from "@/mastra";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type ChatRequestBody = {
   threadId?: string;

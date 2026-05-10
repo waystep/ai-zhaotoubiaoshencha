@@ -1,19 +1,30 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { FileText, Loader2, CheckCircle, XCircle, Clock, Trash2, Play, ArrowLeft } from "lucide-react";
+import { Check, FileText, Loader2, CheckCircle, XCircle, Clock, Trash2, Play, Plus, Minus, Upload, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import { clampPercent, formatDateCN } from "@/lib/ui/format";
 import { docTypeLabel, parseStatusLabel } from "@/lib/ui/labels";
 import { useDashboardScrollRestoration } from "@/hooks/use-dashboard-scroll-restoration";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface Document {
   id: string;
@@ -24,19 +35,60 @@ interface Document {
   createdAt: string;
 }
 
-const DOC_TYPE_FILTERS: { value: string; label: string }[] = [
-  { value: "tender_doc", label: "招标文件" },
-  { value: "legal_doc", label: "法律文件" },
-  { value: "bid_doc", label: "投标文件" },
-  { value: "review_report", label: "审查报告" },
+const DOC_TYPE_FILTERS: { value: string; label: string; color: string }[] = [
+  { value: "tender_doc", label: "招标文件", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "legal_doc", label: "法律文件", color: "bg-purple-50 text-purple-700 border-purple-200" },
+  { value: "bid_doc", label: "投标文件", color: "bg-green-50 text-green-700 border-green-200" },
+  { value: "review_report", label: "审查报告", color: "bg-orange-50 text-orange-700 border-orange-200" },
 ];
 
 function initialTypeFilters(): Record<string, boolean> {
   return Object.fromEntries(DOC_TYPE_FILTERS.map((t) => [t.value, true]));
 }
 
+function SelectionBox({
+  checked,
+  indeterminate,
+  disabled,
+  onClick,
+  ariaLabel,
+  className,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  ariaLabel: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-label={ariaLabel}
+      aria-checked={indeterminate ? "mixed" : checked}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        checked || indeterminate
+          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+          : "border-input bg-background text-transparent hover:border-primary/60",
+        disabled && "cursor-not-allowed opacity-40",
+        className
+      )}
+    >
+      {indeterminate ? (
+        <Minus className="h-3 w-3 stroke-[3]" />
+      ) : checked ? (
+        <Check className="h-3 w-3 stroke-[3]" />
+      ) : null}
+    </button>
+  );
+}
+
 export default function ProjectDocumentsPage() {
-  const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
   const { toast } = useToast();
@@ -49,7 +101,6 @@ export default function ProjectDocumentsPage() {
   const [typeFilterEnabled, setTypeFilterEnabled] = useState<Record<string, boolean>>(initialTypeFilters);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
-  const selectAllRef = useRef<HTMLInputElement>(null);
   const { saveNow } = useDashboardScrollRestoration(
     `project-documents:${projectId}?q=${q}&status=${parseStatus}`
   );
@@ -84,12 +135,6 @@ export default function ProjectDocumentsPage() {
       return next;
     });
   }, [filteredDocuments]);
-
-  useEffect(() => {
-    const el = selectAllRef.current;
-    if (!el) return;
-    el.indeterminate = someSelected && !allSelectableSelected;
-  }, [someSelected, allSelectableSelected]);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -143,25 +188,14 @@ export default function ProjectDocumentsPage() {
     try {
       const response = await fetch(`/api/documents/${documentId}/parse`, { method: "POST" });
       if (response.ok) {
-        toast({
-          title: "解析任务已启动",
-          description: "文档正在解析中，请稍后刷新查看结果",
-        });
+        toast({ title: "解析任务已启动", description: "文档正在解析中" });
         fetchDocuments();
       } else {
         const error = await response.json().catch(() => ({}));
-        toast({
-          title: "解析失败",
-          description: error.error || "请求失败",
-          variant: "destructive",
-        });
+        toast({ title: "解析失败", description: error.error || "请求失败", variant: "destructive" });
       }
     } catch {
-      toast({
-        title: "网络错误",
-        description: "请检查您的网络连接",
-        variant: "destructive",
-      });
+      toast({ title: "网络错误", description: "请检查网络连接", variant: "destructive" });
     } finally {
       setParsingIds((prev) => prev.filter((id) => id !== documentId));
     }
@@ -170,51 +204,29 @@ export default function ProjectDocumentsPage() {
   async function handleReparse(documentId: string) {
     setParsingIds((prev) => [...prev, documentId]);
     try {
-      const response = await fetch(`/api/documents/${documentId}/parse`, {
-        method: "POST",
-      });
-
+      const response = await fetch(`/api/documents/${documentId}/parse`, { method: "POST" });
       if (response.ok) {
-        toast({
-          title: "重新解析已启动",
-          description: "文档正在解析中，请稍后刷新查看结果",
-        });
+        toast({ title: "重新解析已启动", description: "文档正在解析中" });
         fetchDocuments();
       } else {
         const error = await response.json();
-        toast({
-          title: "解析失败",
-          description: error.error || error.details,
-          variant: "destructive",
-        });
+        toast({ title: "解析失败", description: error.error || error.details, variant: "destructive" });
       }
     } catch {
-      toast({
-        title: "网络错误",
-        description: "请检查您的网络连接",
-        variant: "destructive",
-      });
+      toast({ title: "网络错误", description: "请检查网络连接", variant: "destructive" });
     } finally {
       setParsingIds((prev) => prev.filter((id) => id !== documentId));
     }
   }
 
   async function handleDelete(documentId: string, documentName: string) {
-    if (!confirm(`确定要删除文档 "${documentName}" 吗？此操作不可撤销。`)) {
-      return;
-    }
+    if (!confirm(`确定要删除文档 "${documentName}" 吗？此操作不可撤销。`)) return;
 
     setDeletingIds((prev) => [...prev, documentId]);
     try {
-      const response = await fetch(`/api/documents/${documentId}`, {
-        method: "DELETE",
-      });
-
+      const response = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
       if (response.ok) {
-        toast({
-          title: "删除成功",
-          description: "文档已删除",
-        });
+        toast({ title: "删除成功", description: "文档已删除" });
         setDocuments((prev) => prev.filter((d) => d.id !== documentId));
         setSelectedIds((prev) => {
           const next = new Set(prev);
@@ -223,18 +235,10 @@ export default function ProjectDocumentsPage() {
         });
       } else {
         const error = await response.json();
-        toast({
-          title: "删除失败",
-          description: error.error || "删除文档失败",
-          variant: "destructive",
-        });
+        toast({ title: "删除失败", description: error.error || "删除失败", variant: "destructive" });
       }
     } catch {
-      toast({
-        title: "网络错误",
-        description: "请检查您的网络连接",
-        variant: "destructive",
-      });
+      toast({ title: "网络错误", description: "请检查网络连接", variant: "destructive" });
     } finally {
       setDeletingIds((prev) => prev.filter((id) => id !== documentId));
     }
@@ -246,16 +250,10 @@ export default function ProjectDocumentsPage() {
       return d && d.parseStatus !== "processing";
     });
     if (ids.length === 0) {
-      toast({
-        title: "无法删除",
-        description: "没有可删除的文档（解析中的文档需等待完成后再删）",
-        variant: "destructive",
-      });
+      toast({ title: "无法删除", description: "没有可删除的文档", variant: "destructive" });
       return;
     }
-    if (!confirm(`确定删除已选的 ${ids.length} 个文档？此操作不可撤销。`)) {
-      return;
-    }
+    if (!confirm(`确定删除已选的 ${ids.length} 个文档？此操作不可撤销。`)) return;
 
     setBatchBusy(true);
     let ok = 0;
@@ -278,43 +276,19 @@ export default function ProjectDocumentsPage() {
     setSelectedIds(new Set());
     setBatchBusy(false);
     if (ok > 0) {
-      toast({
-        title: "批量删除完成",
-        description:
-          failed.length === 0
-            ? `已删除 ${ok} 个文档`
-            : `已删除 ${ok} 个；${failed.length} 个失败`,
-      });
+      toast({ title: "批量删除完成", description: failed.length === 0 ? `已删除 ${ok} 个文档` : `已删除 ${ok} 个；${failed.length} 个失败` });
     }
     if (failed.length > 0 && ok === 0) {
-      toast({
-        title: "删除失败",
-        description: failed.slice(0, 3).join("；"),
-        variant: "destructive",
-      });
-    } else if (failed.length > 0) {
-      toast({
-        title: "部分删除失败",
-        description: failed.slice(0, 3).join("；"),
-        variant: "destructive",
-      });
+      toast({ title: "删除失败", description: failed.slice(0, 3).join("；"), variant: "destructive" });
     }
-    fetchDocuments();
   }
 
   async function handleBatchParse() {
     const targets = [...selectedIds]
       .map((id) => documents.find((d) => d.id === id))
-      .filter(
-        (d): d is Document =>
-          !!d && (d.parseStatus === "pending" || d.parseStatus === "failed")
-      );
+      .filter((d): d is Document => !!d && (d.parseStatus === "pending" || d.parseStatus === "failed"));
     if (targets.length === 0) {
-      toast({
-        title: "没有可解析的文档",
-        description: "请选择状态为「待解析」或「解析失败」的文档",
-        variant: "destructive",
-      });
+      toast({ title: "没有可解析的文档", description: "请选择待解析或解析失败的文档", variant: "destructive" });
       return;
     }
 
@@ -335,54 +309,26 @@ export default function ProjectDocumentsPage() {
     }
     setBatchBusy(false);
     setSelectedIds(new Set());
-    const failHint =
-      failed.length > 0
-        ? ` 失败 ${failed.length} 个：${failed.slice(0, 2).join("；")}${failed.length > 2 ? "…" : ""}`
-        : "";
-    toast({
-      title: failed.length > 0 && ok === 0 ? "批量解析失败" : "批量解析已提交",
-      description: `已提交 ${ok} 个解析任务。${failHint}`.trim(),
-      ...(failed.length > 0 && ok === 0 ? { variant: "destructive" as const } : {}),
-    });
+    toast({ title: "批量解析已提交", description: `已提交 ${ok} 个解析任务` });
     fetchDocuments();
   }
 
   const getParseStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "processing":
-        return <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />;
+        return <Loader2 className="h-4 w-4 text-yellow-500 animate-spin" />;
       case "failed":
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-red-500" />;
       default:
-        return <Clock className="h-5 w-5 text-gray-400" />;
+        return <Clock className="h-4 w-4 text-gray-400" />;
     }
   };
 
-  const chips: Array<{ key: string; label: string; onRemove: () => void }> = [];
-  const enabledTypes = DOC_TYPE_FILTERS.filter((t) => typeFilterEnabled[t.value]).map((t) => t.label);
-  if (enabledTypes.length > 0 && enabledTypes.length < DOC_TYPE_FILTERS.length) {
-    chips.push({
-      key: "types",
-      label: `类型：${enabledTypes.join("、")}`,
-      onRemove: () => setTypeFilterEnabled(initialTypeFilters()),
-    });
-  }
-  if (parseStatus) {
-    chips.push({
-      key: "status",
-      label: `解析状态：${parseStatusLabel(parseStatus, 0)}`,
-      onRemove: () => setParseStatus(""),
-    });
-  }
-  if (q.trim()) {
-    chips.push({
-      key: "q",
-      label: `搜索：${q.trim()}`,
-      onRemove: () => setQ(""),
-    });
-  }
+  const getTypeStyle = (docType: string) => {
+    return DOC_TYPE_FILTERS.find((t) => t.value === docType)?.color || "bg-gray-50 text-gray-700 border-gray-200";
+  };
 
   const batchParseableCount = [...selectedIds].filter((id) => {
     const d = documents.find((x) => x.id === id);
@@ -394,85 +340,152 @@ export default function ProjectDocumentsPage() {
     return d && d.parseStatus !== "processing";
   }).length;
 
+  // 筛选条件摘要
+  const activeFiltersCount = [
+    parseStatus,
+    DOC_TYPE_FILTERS.filter((t) => !typeFilterEnabled[t.value]).length > 0,
+  ].filter(Boolean).length;
+
   return (
-    <div className="space-y-6">
-      {/* 吸顶筛选条 */}
-      <div className="sticky top-0 z-10 -mx-6 border-b bg-background/85 px-6 py-4 backdrop-blur">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <div className="flex-1 min-w-0">
-            <label className="text-sm text-muted-foreground">搜索（文档名）</label>
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="输入关键词…" />
-          </div>
-          <div className="w-full md:w-[200px]">
-            <label className="text-sm text-muted-foreground">解析状态</label>
-            <select
-              value={parseStatus}
-              onChange={(e) => setParseStatus(e.target.value)}
-              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="">全部</option>
-              <option value="processing">解析中</option>
-              <option value="completed">已解析</option>
-              <option value="failed">解析失败</option>
-              <option value="pending">待解析</option>
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
+    <div className="space-y-4">
+      {/* 紧凑的工具栏 */}
+      <div className="sticky top-0 z-10 -mx-6 border-b bg-background/95 backdrop-blur px-6 py-3">
+        <div className="flex items-center gap-3">
+          {/* 类型筛选 */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm transition-colors",
+                  "hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                )}
+              >
+                <span className="text-muted-foreground">类型</span>
+                {/* 已选类型标签 */}
+                <div className="flex items-center gap-1">
+                  {DOC_TYPE_FILTERS.filter((t) => typeFilterEnabled[t.value]).map((t) => (
+                    <span
+                      key={t.value}
+                      className={cn(
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
+                        t.color.replace("border-", "").replace("bg-", "bg-").split(" ").find(c => c.startsWith("bg-")),
+                        t.color.split(" ").find(c => c.startsWith("text-"))
+                      )}
+                    >
+                      {t.label}
+                    </span>
+                  ))}
+                  {DOC_TYPE_FILTERS.filter((t) => !typeFilterEnabled[t.value]).length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      +{DOC_TYPE_FILTERS.filter((t) => !typeFilterEnabled[t.value]).length}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[220px] p-3">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">选择文档类型</div>
+              <div className="space-y-1">
+                {DOC_TYPE_FILTERS.map((t) => (
+                  <label
+                    key={t.value}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer transition-colors",
+                      typeFilterEnabled[t.value] ? "bg-muted" : "hover:bg-muted/50"
+                    )}
+                    onClick={() => toggleTypeFilter(t.value)}
+                  >
+                    <SelectionBox
+                      checked={typeFilterEnabled[t.value] ?? false}
+                      onClick={() => toggleTypeFilter(t.value)}
+                      ariaLabel={`切换${t.label}`}
+                    />
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium",
+                        t.color
+                      )}
+                    >
+                      {t.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 pt-2 border-t flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs flex-1"
+                  onClick={() => setTypeFilterEnabled(initialTypeFilters())}
+                >
+                  全选
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs flex-1 text-muted-foreground"
+                  onClick={() => setTypeFilterEnabled({ tender_doc: false, legal_doc: false, bid_doc: false, review_report: false })}
+                >
+                  清空
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* 状态筛选 */}
+          <Select
+            value={parseStatus || "all"}
+            onValueChange={(v) => setParseStatus(v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="全部状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="processing">解析中</SelectItem>
+              <SelectItem value="completed">已解析</SelectItem>
+              <SelectItem value="failed">解析失败</SelectItem>
+              <SelectItem value="pending">待解析</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* 清空筛选 */}
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
               onClick={() => {
-                setQ("");
                 setParseStatus("");
                 setTypeFilterEnabled(initialTypeFilters());
               }}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              清空
-            </Button>
-          </div>
-        </div>
+              清空筛选
+            </button>
+          )}
 
-        {chips.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {chips.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                onClick={c.onRemove}
-                className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs hover:bg-muted"
-                title="点击移除筛选"
-              >
-                <span className="truncate">{c.label}</span>
-                <span className="text-muted-foreground">×</span>
-              </button>
-            ))}
-            {hasProcessing && (
-              <Badge variant="outline" title="解析中会自动刷新">
-                自动刷新中
-              </Badge>
-            )}
-          </div>
-        )}
-      </div>
+          {/* 自动刷新提示 */}
+          {hasProcessing && (
+            <Badge variant="outline" className="text-xs">
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              自动刷新
+            </Badge>
+          )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
-            onClick={() => router.push(`/projects/${projectId}`)}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            返回项目详情
-          </Button>
-          <h2 className="text-3xl font-bold tracking-tight">文档管理</h2>
-          <p className="text-muted-foreground">
-            管理项目相关文档
-          </p>
+          {/* 上传按钮 - 固定右侧 */}
+          <div className="ml-auto shrink-0">
+            <Link href={`/projects/${projectId}/documents/upload`}>
+              <Button size="sm">
+                <Upload className="mr-1.5 h-4 w-4" />
+                上传
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
+      {/* 内容区 */}
       {isLoading ? (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
@@ -483,218 +496,198 @@ export default function ProjectDocumentsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">暂无文档</h3>
+            <h3 className="text-h5 mb-2">暂无文档</h3>
             <p className="text-muted-foreground text-center mb-4">
               上传招标文件、法律文件或投标文件开始审查流程
             </p>
+            <Link href={`/projects/${projectId}/documents/upload`}>
+              <Button size="sm">
+                <Upload className="mr-1.5 h-4 w-4" />
+                上传文档
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : DOC_TYPE_FILTERS.every((t) => !typeFilterEnabled[t.value]) ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            请至少选择一种文档类型
+          </CardContent>
+        </Card>
+      ) : filteredDocuments.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            当前筛选条件下没有文档
           </CardContent>
         </Card>
       ) : (
         <>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">按类型筛选</CardTitle>
-              <CardDescription>勾选要显示的类型；未勾选的类型将从列表中隐藏</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-4 pt-0">
-              {DOC_TYPE_FILTERS.map((t) => (
-                <label
-                  key={t.value}
-                  className="flex items-center gap-2 text-sm cursor-pointer select-none"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-input accent-primary"
-                    checked={typeFilterEnabled[t.value] ?? false}
-                    onChange={() => toggleTypeFilter(t.value)}
-                  />
-                  <span>{t.label}</span>
-                </label>
-              ))}
-              <Button
-                type="button"
-                variant="link"
-                className="h-auto p-0 text-sm"
-                onClick={() => setTypeFilterEnabled(initialTypeFilters())}
-              >
-                重置为全选
-              </Button>
-            </CardContent>
-          </Card>
+          {/* 批量操作栏 - 紧凑样式 */}
+          <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <SelectionBox
+                checked={allSelectableSelected}
+                indeterminate={someSelected && !allSelectableSelected}
+                onClick={toggleSelectAll}
+                disabled={batchBusy || selectableDocs.length === 0}
+                ariaLabel="选择全部"
+              />
+              <span className="font-medium">全选</span>
+              <span className="text-muted-foreground text-xs">
+                {selectedIds.size}/{selectableDocs.length}
+              </span>
+            </label>
 
-          {DOC_TYPE_FILTERS.every((t) => !typeFilterEnabled[t.value]) ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                请至少勾选一种文档类型，或点击「重置为全选」
-              </CardContent>
-            </Card>
-          ) : filteredDocuments.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                当前筛选条件下没有文档
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3">
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer select-none">
-                  <input
-                    ref={selectAllRef}
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-input accent-primary"
-                    checked={allSelectableSelected}
-                    onChange={toggleSelectAll}
-                    disabled={batchBusy || selectableDocs.length === 0}
-                  />
-                  全选
-                  <span className="text-muted-foreground font-normal">
-                    （{selectedIds.size}/{selectableDocs.length}）
-                  </span>
-                </label>
-                <div className="h-4 w-px bg-border hidden sm:block" />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={batchBusy || batchParseableCount === 0}
-                  onClick={handleBatchParse}
-                >
-                  {batchBusy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    `批量解析${batchParseableCount > 0 ? ` (${batchParseableCount})` : ""}`
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={batchBusy || batchDeletableCount === 0}
-                  className="text-destructive hover:text-destructive"
-                  onClick={handleBatchDelete}
-                >
-                  {batchBusy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    `批量删除${batchDeletableCount > 0 ? ` (${batchDeletableCount})` : ""}`
-                  )}
-                </Button>
-              </div>
+            <div className="h-4 w-px bg-border" />
 
-              <div className="grid gap-4">
-                {filteredDocuments.map((doc) => {
-                  const isProcessing = doc.parseStatus === "processing";
-                  const isSelected = selectedIds.has(doc.id);
-                  return (
-                    <Card
-                      key={doc.id}
-                      className={cn(isSelected && "ring-2 ring-primary/30 border-primary/40")}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={batchBusy || batchParseableCount === 0}
+              onClick={handleBatchParse}
+              className="h-7 px-2 text-xs"
+            >
+              {batchBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : `批量解析 (${batchParseableCount})`}
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={batchBusy || batchDeletableCount === 0}
+              onClick={handleBatchDelete}
+              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+            >
+              {batchBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : `批量删除 (${batchDeletableCount})`}
+            </Button>
+
+            <div className="ml-auto text-xs text-muted-foreground">
+              共 {filteredDocuments.length} 条
+            </div>
+          </div>
+
+          {/* 表格样式文档列表 */}
+          <div className="rounded-lg border overflow-hidden">
+            {/* 表头 */}
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground border-b">
+              <div className="w-4" />
+              <div>文档名称</div>
+              <div className="w-[100px] text-center">类型</div>
+              <div className="w-[120px] text-center">解析状态</div>
+              <div className="w-[80px] text-center">操作</div>
+            </div>
+
+            {/* 表格内容 */}
+            <div className="divide-y">
+              {filteredDocuments.map((doc) => {
+                const isProcessing = doc.parseStatus === "processing";
+                const isSelected = selectedIds.has(doc.id);
+
+                return (
+                  <div
+                    key={doc.id}
+                    className={cn(
+                      "grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors",
+                      isSelected && "bg-primary/5"
+                    )}
+                  >
+                    {/* 选择框 */}
+                    <SelectionBox
+                      checked={isSelected}
+                      disabled={isProcessing || batchBusy}
+                      onClick={() => toggleRow(doc)}
+                      ariaLabel={`选择 ${doc.name}`}
+                    />
+
+                    {/* 文档名称 */}
+                    <Link
+                      href={`/projects/${projectId}/documents/${doc.id}`}
+                      onClick={() => saveNow()}
+                      className="flex items-center gap-3 min-w-0 group"
                     >
-                      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 shrink-0 rounded border-input accent-primary"
-                            checked={isSelected}
-                            disabled={isProcessing || batchBusy}
-                            onChange={() => toggleRow(doc)}
-                            aria-label={`选择 ${doc.name}`}
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                          {doc.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDateCN(doc.createdAt)}
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* 类型 */}
+                    <div className="w-[100px] text-center">
+                      <Badge variant="outline" className={cn("text-xs", getTypeStyle(doc.docType))}>
+                        {docTypeLabel(doc.docType)}
+                      </Badge>
+                    </div>
+
+                    {/* 解析状态 */}
+                    <div className="w-[120px] flex items-center justify-center gap-2">
+                      {getParseStatusIcon(doc.parseStatus)}
+                      <span className="text-xs text-muted-foreground">
+                        {parseStatusLabel(doc.parseStatus, clampPercent(doc.taskProgress))}
+                      </span>
+                      {isProcessing && (
+                        <div className="w-16 h-1 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-[width]"
+                            style={{ width: `${clampPercent(doc.taskProgress)}%` }}
                           />
-                          <FileText className="h-5 w-5 text-primary shrink-0" />
-                          <div className="min-w-0">
-                            <CardTitle className="text-base">
-                              <TruncatedText text={doc.name} />
-                            </CardTitle>
-                            <CardDescription>
-                              {docTypeLabel(doc.docType)} ·
-                              {formatDateCN(doc.createdAt)}
-                            </CardDescription>
-                          </div>
                         </div>
-                        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-4 shrink-0">
-                          <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
-                            <div className="flex items-center gap-2">
-                              {getParseStatusIcon(doc.parseStatus)}
-                              <span className="text-sm text-muted-foreground whitespace-nowrap">
-                                {parseStatusLabel(doc.parseStatus, clampPercent(doc.taskProgress))}
-                              </span>
-                            </div>
-                            {doc.parseStatus === "processing" && (
-                              <div className="w-24 shrink-0">
-                                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary transition-[width] duration-300"
-                                    style={{
-                                      width: `${clampPercent(doc.taskProgress)}%`,
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          {doc.parseStatus === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleParsePending(doc.id)}
-                              disabled={parsingIds.includes(doc.id) || batchBusy}
-                            >
-                              {parsingIds.includes(doc.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "解析"
-                              )}
-                            </Button>
-                          )}
-                          {doc.parseStatus === "failed" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReparse(doc.id)}
-                              disabled={parsingIds.includes(doc.id) || batchBusy}
-                            >
-                              {parsingIds.includes(doc.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Play className="h-4 w-4 mr-1" />
-                                  重新解析
-                                </>
-                              )}
-                            </Button>
-                          )}
-                          {doc.parseStatus === "completed" && (
-                            <Link href={`/projects/${projectId}/documents/${doc.id}`} onClick={() => saveNow()}>
-                              <Button size="sm" variant="outline" disabled={batchBusy}>
-                                查看详情
-                              </Button>
-                            </Link>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDelete(doc.id, doc.name)}
-                            disabled={
-                              deletingIds.includes(doc.id) ||
-                              doc.parseStatus === "processing" ||
-                              batchBusy
-                            }
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            {deletingIds.includes(doc.id) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
+                      )}
+                    </div>
+
+                    {/* 操作 */}
+                    <div className="w-[80px] flex items-center justify-center gap-1">
+                      {doc.parseStatus === "pending" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleParsePending(doc.id)}
+                          disabled={parsingIds.includes(doc.id) || batchBusy}
+                          className="h-7 px-2 text-xs"
+                        >
+                          {parsingIds.includes(doc.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "解析"}
+                        </Button>
+                      )}
+                      {doc.parseStatus === "failed" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleReparse(doc.id)}
+                          disabled={parsingIds.includes(doc.id) || batchBusy}
+                          className="h-7 px-2 text-xs"
+                        >
+                          {parsingIds.includes(doc.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : "重试"}
+                        </Button>
+                      )}
+                      {doc.parseStatus === "completed" && (
+                        <Link href={`/projects/${projectId}/documents/${doc.id}`} onClick={() => saveNow()}>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                            查看
                           </Button>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  );
-                })}
-              </div>
-            </>
-          )}
+                        </Link>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDelete(doc.id, doc.name)}
+                        disabled={deletingIds.includes(doc.id) || isProcessing || batchBusy}
+                        className="h-7 px-1.5 text-destructive hover:text-destructive"
+                      >
+                        {deletingIds.includes(doc.id) ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </>
       )}
     </div>

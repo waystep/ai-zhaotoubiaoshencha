@@ -3,6 +3,8 @@ import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
 import { getReviewItemsTool } from "../tools/get-review-items-tool";
 import { getResponseItemsTool } from "../tools/get-response-items-tool";
+import { getReportTool } from "../tools/get-report-tool";
+import { documentReaderTool } from "../tools/document-reader-tool";
 import {
   contentReviewInstructions,
   contentReviewWorkingMemoryTemplate,
@@ -78,8 +80,9 @@ export const contentReviewAgent = new Agent({
     },
   }),
   tools: {
+    getReportTool,
     getReviewItemsTool,
     getResponseItemsTool,
-    // 将在后续添加：semanticAnalysisTool, complianceCheckTool, biasDetectionTool
+    documentReaderTool,
   },
 });
