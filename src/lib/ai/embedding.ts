@@ -1,45 +1,29 @@
 // 嵌入向量生成与页面合并工具
+// 使用本地 LM Studio 作为 embedding 服务
 import { db } from "@/lib/db/client";
 import { documentPageEmbeddings, documentParsedResults } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
-interface EmbeddingConfig {
-  model?: string;
-  dimensions?: number;
-}
-
-const DEFAULT_CONFIG: EmbeddingConfig = {
-  model: "text-embedding-3-small",
-  dimensions: 1536,
-};
+const EMBEDDING_API = (process.env.EMBEDDING_API_URL || "http://192.168.2.81:1234/v1") + "/embeddings";
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "text-embedding-nomic-embed-text-v1.5";
+const EMBEDDING_API_KEY = process.env.EMBEDDING_API_KEY || "lm-studio";
 
 /**
- * 调用 OpenAI 兼容的 embeddings API 生成向量
+ * 调用 LM Studio 兼容的 embeddings API 生成向量
  */
-export async function generateEmbeddings(
-  texts: string[],
-  config: EmbeddingConfig = {}
-): Promise<number[][]> {
-  const { model, dimensions } = { ...DEFAULT_CONFIG, ...config };
-  const apiBase = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set");
-  }
-
-  const response = await fetch(`${apiBase}/embeddings`, {
+export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+  const response = await fetch(EMBEDDING_API, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${EMBEDDING_API_KEY}`,
     },
-    body: JSON.stringify({ model, input: texts, dimensions }),
+    body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts }),
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Embedding API error: ${response.status} ${text}`);
+    const errText = await response.text();
+    throw new Error(`Embedding API error: ${response.status} ${errText}`);
   }
 
   const data = await response.json();
@@ -52,7 +36,13 @@ export async function generateEmbeddings(
  * 按页合并 blocks 文本
  */
 export function mergeBlocksByPage(
-  blocks: { id: string; pageNumber: number; blockIndex: number; content: string | null; blockType: string | null }[]
+  blocks: {
+    id: string;
+    pageNumber: number;
+    blockIndex: number;
+    content: string | null;
+    blockType: string | null;
+  }[]
 ): Map<number, { text: string; blockIds: string[] }> {
   const pages = new Map<number, { textParts: string[]; blockIds: string[] }>();
 
@@ -62,17 +52,16 @@ export function mergeBlocksByPage(
     }
     const page = pages.get(block.pageNumber)!;
     if (block.content?.trim()) {
-      page.textParts.push(`[${block.blockType || "text"} #${block.blockIndex}] ${block.content}`);
+      page.textParts.push(
+        `[${block.blockType || "text"} #${block.blockIndex}] ${block.content}`
+      );
     }
     page.blockIds.push(block.id);
   }
 
   const result = new Map<number, { text: string; blockIds: string[] }>();
   for (const [pageNum, data] of pages) {
-    result.set(pageNum, {
-      text: data.textParts.join("\n\n"),
-      blockIds: data.blockIds,
-    });
+    result.set(pageNum, { text: data.textParts.join("\n\n"), blockIds: data.blockIds });
   }
   return result;
 }
@@ -93,40 +82,34 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
- * 为文档生成并存储页面级嵌入
+ * 为文档生成并存储页面级嵌入向量
  */
 export async function generatePageEmbeddings(documentId: string): Promise<number> {
-  // 获取解析结果和blocks
   const parsedResult = await db.query.documentParsedResults.findFirst({
     where: eq(documentParsedResults.documentId, documentId),
     with: { blocks: true },
   });
 
   if (!parsedResult || parsedResult.blocks.length === 0) {
-    console.log(`[Embedding] No blocks found for document ${documentId}`);
+    console.log(`[Embedding] Document ${documentId}: no blocks found`);
     return 0;
   }
 
-  // 合并blocks按页
   const pages = mergeBlocksByPage(parsedResult.blocks);
-  console.log(`[Embedding] Document ${documentId}: ${pages.size} pages to embed`);
+  console.log(`[Embedding] Document ${documentId}: ${pages.size} pages to embed via ${EMBEDDING_MODEL}`);
 
-  // 生成嵌入
   const pageEntries = Array.from(pages.entries());
   const texts = pageEntries.map(([, data]) => data.text);
   const embeddings = await generateEmbeddings(texts);
 
-  // 存储
   let count = 0;
   for (let i = 0; i < pageEntries.length; i++) {
     const [pageNumber, data] = pageEntries[i];
-    // 检查是否已存在，存在则跳过
     const existing = await db.query.documentPageEmbeddings.findFirst({
-      where: (fields, { and }) =>
-        and(
-          eq(fields.documentId, documentId),
-          eq(fields.pageNumber, pageNumber)
-        ),
+      where: and(
+        eq(documentPageEmbeddings.documentId, documentId),
+        eq(documentPageEmbeddings.pageNumber, pageNumber)
+      ),
     });
     if (existing) continue;
 
@@ -137,6 +120,7 @@ export async function generatePageEmbeddings(documentId: string): Promise<number
       pageText: data.text,
       blockIds: data.blockIds,
       embedding: embeddings[i] as any,
+      embeddingModel: EMBEDDING_MODEL,
     });
     count++;
   }

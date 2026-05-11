@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   decimal,
+  customType,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -617,6 +618,25 @@ export const extractionItems = pgTable("extraction_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// 向量类型 — 优先使用 pgvector，不可用时降级为 jsonb
+// pgvector 未安装时需手动改为 jsonb("embedding") 后重建迁移
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    // pgvector 可用时使用 vector(768)，否则降级为 jsonb
+    return process.env.VECTOR_AVAILABLE === "true" ? "vector(768)" : "jsonb";
+  },
+  toDriver(value: number[]): string {
+    return JSON.stringify(value);
+  },
+  fromDriver(value: string): number[] {
+    if (typeof value === "string") {
+      // pgvector 返回的向量格式: [0.1,0.2,...]
+      try { return JSON.parse(value); } catch { return []; }
+    }
+    return (value as unknown as number[]) || [];
+  },
+});
+
 // 文档页面嵌入表 - 用于RAG语义搜索
 export const documentPageEmbeddings = pgTable("document_page_embeddings", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -632,7 +652,7 @@ export const documentPageEmbeddings = pgTable("document_page_embeddings", {
   // 关联的block ID列表，用于回溯定位
   blockIds: jsonb("block_ids").notNull().default([]),
   // 嵌入向量（JSON数组）
-  embedding: jsonb("embedding").notNull(),
+  embedding: vector("embedding").notNull(),
   embeddingModel: varchar("embedding_model", { length: 100 }).default("text-embedding-3-small"),
   createdAt: timestamp("created_at").defaultNow(),
 });
