@@ -16,30 +16,10 @@ export const reportGenerationAgent = new Agent({
   description: `汇总审查结果，生成结构化审查报告并存储到数据库。
 
 输入要求：
-- blockReviews: 所有block的审查结果列表
 - reportId: 审查报告ID（用于存储）
 - projectId: 项目ID
-- documentName: 文档名称
 
 输出格式：
-{
-  "success": true,
-  "reportId": "...",
-  "issueCount": 10,
-  "score": 85,
-  "recommendation": "pass/revise/fail",
-  "summary": "本次审查共发现10个问题...",
-  "issues": [
-    {
-      "category": "资质要求",
-      "severity": "major",
-      "title": "...",
-      "description": "...",
-      "location": { "pageNumber": 1, "blockIndex": 5 },
-      "suggestion": "..."
-    }
-  ]
-}
 
 报告结构：
 - 审查概要：项目信息、审查范围、检查点清单

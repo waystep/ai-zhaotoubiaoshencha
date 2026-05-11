@@ -15,6 +15,8 @@ import {
   supervisorWorkingMemoryTemplate,
 } from "../config/review";
 import { pgStore, pgVector } from "../storage";
+import {tenderReviewAgent} from "@/mastra/agents/tender-review-agent";
+import {tenderResponseAgent} from "@/mastra/agents/tender-response-agent";
 
 export const tenderReviewSupervisor = new Agent({
   id: "tender-review-supervisor",
@@ -61,8 +63,8 @@ export const tenderReviewSupervisor = new Agent({
   }),
   agents: {
     extractionAgent,
-    contentReviewAgent,
-    imageReviewAgent,
+    tenderReviewAgent,
+    tenderResponseAgent,
     reportGenerationAgent,
   },
   tools: {
