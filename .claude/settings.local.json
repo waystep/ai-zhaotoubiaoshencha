@@ -15,7 +15,9 @@
       "Bash(rm -f \"D:/Projects/Looma/src/app/\\(dashboard\\)/projects/[projectId]/reports/chat/page.tsx\")",
       "Bash(rmdir \"D:/Projects/Looma/src/app/\\(dashboard\\)/projects/[projectId]/reports/chat\")",
       "mcp__Claude_Preview__preview_start",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(cat logs/*.log)",
+      "Bash(ls -la logs/)"
     ]
   }
 }

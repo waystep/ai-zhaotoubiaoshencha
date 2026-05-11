@@ -3,6 +3,7 @@ import {
   documents,
   documentParsedResults,
   documentBlocks,
+  imageRiskAnalysis,
 } from "@/lib/db/schema";
 import { eq, and, isNotNull } from "drizzle-orm";
 import { mineruClient } from "@/lib/ai/mineru-client";
@@ -278,6 +279,14 @@ async function storeParseResult(
       return;
     }
 
+    // 查询文档类型，只有投标文件才需要图片风险分析
+    const doc = await tx.query.documents.findFirst({
+      where: eq(documents.id, documentId),
+      columns: { docType: true },
+    });
+    const isBidDoc = doc?.docType === "bid_doc";
+    console.log(`[Checker] 文档类型: ${doc?.docType}, 是否投标文件: ${isBidDoc}`);
+
     // 插入解析结果
     const [parsedResultRecord] = await tx
       .insert(documentParsedResults)
@@ -292,16 +301,32 @@ async function storeParseResult(
 
     console.log(`[Checker] 解析结果 ID: ${parsedResultRecord.id}`);
 
-    // 批量插入 blocks
+    // 批量插入 blocks（保留 imagePath）
+    const imageBlocksData: { imagePath: string; pageNumber: number; blockId?: string }[] = [];
+
     if (parseResult.blocks.length > 0) {
-      const blocks = parseResult.blocks.map((block) => ({
-        parsedResultId: parsedResultRecord.id,
-        pageNumber: block.pageNumber,
-        blockIndex: block.index,
-        blockType: block.type,
-        content: block.content,
-        bbox: block.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
-      }));
+      const blocks = parseResult.blocks.map((block) => {
+        // 对于图片类型，保存 imagePath
+        const imagePath = block.type === "image" ? block.imagePath : null;
+
+        // 收集图片区块信息，用于后续创建分析记录
+        if (block.type === "image" && imagePath) {
+          imageBlocksData.push({
+            imagePath,
+            pageNumber: block.pageNumber,
+          });
+        }
+
+        return {
+          parsedResultId: parsedResultRecord.id,
+          pageNumber: block.pageNumber,
+          blockIndex: block.index,
+          blockType: block.type,
+          content: block.content,
+          bbox: block.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
+          imagePath,
+        };
+      });
 
       // 每批 100 条
       const batchSize = 100;
@@ -310,7 +335,22 @@ async function storeParseResult(
         await tx.insert(documentBlocks).values(batch);
       }
 
-      console.log(`[Checker] 已插入 ${blocks.length} 个区块`);
+      console.log(`[Checker] 已插入 ${blocks.length} 个区块，其中 ${imageBlocksData.length} 个图片区块`);
+    }
+
+    // 为图片区块创建风险分析待处理记录（仅针对投标文件）
+    if (isBidDoc && imageBlocksData.length > 0) {
+      await tx.insert(imageRiskAnalysis).values(
+        imageBlocksData.map((img) => ({
+          documentId,
+          imagePath: img.imagePath,
+          pageNumber: img.pageNumber,
+          status: "pending" as const,
+        }))
+      );
+      console.log(`[Checker] 已创建 ${imageBlocksData.length} 个图片风险分析待处理记录（投标文件）`);
+    } else if (imageBlocksData.length > 0) {
+      console.log(`[Checker] 跳过图片风险分析（非投标文件，共 ${imageBlocksData.length} 张图片）`);
     }
 
     // 更新文档状态为 completed

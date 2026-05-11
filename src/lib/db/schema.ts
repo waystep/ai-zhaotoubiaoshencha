@@ -86,6 +86,14 @@ export const parseStatusEnum = pgEnum("parse_status", [
   "failed",        // 解析失败
 ]);
 
+// 图片风险分析状态
+export const imageRiskStatusEnum = pgEnum("image_risk_status", [
+  "pending",       // 待分析
+  "processing",    // 分析中
+  "completed",     // 已完成
+  "failed",        // 分析失败
+]);
+
 // 提取状态
 export const extractionStatusEnum = pgEnum("extraction_status", [
   "pending",       // 待提取
@@ -299,13 +307,15 @@ export const documentBlocks = pgTable("document_blocks", {
   // 位置信息
   pageNumber: integer("page_number").notNull(),       // 页码
   blockIndex: integer("block_index").notNull(),       // 区块序号
-  blockType: varchar("block_type", { length: 50 }),   // 区块类型 (text, table, title, paragraph)
+  blockType: varchar("block_type", { length: 50 }),   // 区块类型 (text, table, title, paragraph, image)
   // 区块内容
   content: text("content").notNull(),                 // 文本内容
   // MinerU 坐标信息
   bbox: jsonb("bbox").default({                       // 边界框坐标
     x0: 0, y0: 0, x1: 0, y1: 0
   }),
+  // 图片路径（仅 image 类型区块）
+  imagePath: varchar("image_path", { length: 255 }),  // 图片相对路径
   // 关联信息
   parentBlockId: uuid("parent_block_id"),             // 父区块ID（如表格中的单元格）
   createdAt: timestamp("created_at").defaultNow(),
@@ -367,6 +377,37 @@ export const reviewIssues = pgTable("review_issues", {
   resolvedBy: uuid("resolved_by").references(() => users.id),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// 图片风险分析表 - 存储图片风险检测结果
+export const imageRiskAnalysis = pgTable("image_risk_analysis", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  blockId: uuid("block_id")
+    .references(() => documentBlocks.id, { onDelete: "set null" }),
+  // 图片信息
+  imagePath: varchar("image_path", { length: 255 }).notNull(),
+  pageNumber: integer("page_number").notNull(),
+  // 分析状态
+  status: imageRiskStatusEnum("status").default("pending"),
+  error: text("error"),
+  // 分析结果
+  hasRisk: boolean("has_risk"),
+  riskType: varchar("risk_type", { length: 100 }),
+  riskText: varchar("risk_text", { length: 255 }),
+  confidence: decimal("confidence", { precision: 5, scale: 2 }),
+  reason: text("reason"),
+  suggestion: text("suggestion"),
+  // 原始响应
+  rawResponse: jsonb("raw_response").default({}),
+  // 审核状态
+  isVerified: boolean("is_verified").default(false),
+  verifiedBy: uuid("verified_by").references(() => users.id),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const reviewItemResults = pgTable("review_item_results", {
@@ -652,6 +693,7 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
   reviewReports: many(reviewReports),
   reviewItems: many(reviewItems),
   responseItems: many(responseItems),
+  imageRiskAnalysis: many(imageRiskAnalysis),
 }));
 
 export const documentParsedResultsRelations = relations(
@@ -699,6 +741,21 @@ export const reviewIssuesRelations = relations(reviewIssues, ({ one }) => ({
   block: one(documentBlocks, {
     fields: [reviewIssues.blockId],
     references: [documentBlocks.id],
+  }),
+}));
+
+export const imageRiskAnalysisRelations = relations(imageRiskAnalysis, ({ one }) => ({
+  document: one(documents, {
+    fields: [imageRiskAnalysis.documentId],
+    references: [documents.id],
+  }),
+  block: one(documentBlocks, {
+    fields: [imageRiskAnalysis.blockId],
+    references: [documentBlocks.id],
+  }),
+  verifier: one(users, {
+    fields: [imageRiskAnalysis.verifiedBy],
+    references: [users.id],
   }),
 }));
 

@@ -5,10 +5,12 @@ import {
   documents,
   documentParsedResults,
   documentBlocks,
+  imageRiskAnalysis,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { mineruClient } from "@/lib/ai/mineru-client";
 import { saveImages } from "@/lib/storage/image-storage";
+import { analyzeDocumentImages } from "@/lib/services/image-risk-analyzer";
 import fs from "fs";
 
 interface RouteContext {
@@ -227,14 +229,19 @@ export async function GET(
             .returning();
 
           // 存储blocks
-          const blocks = parseResult.blocks.map((block) => ({
-            parsedResultId: parsedResultRecord.id,
-            pageNumber: block.pageNumber,
-            blockIndex: block.index,
-            blockType: block.type,
-            content: block.content,
-            bbox: block.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
-          }));
+          const blocks = parseResult.blocks.map((block) => {
+            const imagePath =
+              block.type === "image" ? block.imagePath : null;
+            return {
+              parsedResultId: parsedResultRecord.id,
+              pageNumber: block.pageNumber,
+              blockIndex: block.index,
+              blockType: block.type,
+              content: block.content,
+              bbox: block.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 },
+              imagePath,
+            };
+          });
 
           if (blocks.length > 0) {
             const batchSize = 100;
@@ -242,6 +249,30 @@ export async function GET(
               const batch = blocks.slice(i, i + batchSize);
               await db.insert(documentBlocks).values(batch);
               console.log(`[Parse] 已插入批次 ${Math.floor(i / batchSize) + 1}`);
+            }
+          }
+
+          // 为投标文件的图片区块创建风险分析记录
+          const isBidDoc = doc.docType === "bid_doc";
+          if (isBidDoc) {
+            const imageBlocks = parseResult.blocks.filter(
+              (b) => b.type === "image" && b.imagePath
+            );
+            if (imageBlocks.length > 0) {
+              await db.insert(imageRiskAnalysis).values(
+                imageBlocks.map((img) => ({
+                  documentId,
+                  imagePath: img.imagePath!,
+                  pageNumber: img.pageNumber,
+                  status: "pending" as const,
+                }))
+              );
+              console.log(`[Parse] 已创建 ${imageBlocks.length} 个图片风险分析记录`);
+
+              // 触发后台图片分析（fire-and-forget，不阻塞响应）
+              analyzeDocumentImages(documentId).catch((err) =>
+                console.error(`[Parse] 图片分析后台任务失败:`, err)
+              );
             }
           }
 

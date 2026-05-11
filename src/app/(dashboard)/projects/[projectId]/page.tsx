@@ -6,5 +6,5 @@ interface PageProps {
 
 export default async function ProjectDetailPage({ params }: PageProps) {
   const { projectId } = await params;
-  redirect(`/projects/${projectId}/reports`);
+  redirect(`/projects/${projectId}/documents`);
 }

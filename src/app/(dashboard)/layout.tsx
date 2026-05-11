@@ -138,7 +138,7 @@ export default function DashboardLayout({
                   router.push("/projects/new");
                   return;
                 }
-                router.push(`/projects/${projectId}/reports`);
+                router.push(`/projects/${projectId}/documents`);
               }}
             >
               <SelectTrigger className="h-9 w-[280px] bg-card">

@@ -1,4 +1,5 @@
 import { checkProcessingDocuments } from "./document-status-checker";
+import { analyzeAllPendingImages } from "@/lib/services/image-risk-analyzer";
 
 /**
  * 定时任务管理器
@@ -49,6 +50,16 @@ export class CronManager {
           `[Cron] 检查完成: ${stats.checked}个检查, ${stats.completed}个完成, ${stats.failed}个失败, ${stats.skipped}个跳过`
         );
         console.log("[Cron] ========== 检查结束 ==========");
+
+        // 每次定时检查都检查待处理图片（不只依赖新完成的文档）
+        console.log("[Cron] ========== 开始图片风险分析 ==========");
+        const imageStats = await analyzeAllPendingImages();
+        if (imageStats.documents > 0) {
+          console.log(
+            `[Cron] 图片分析完成: ${imageStats.documents}个文档, ${imageStats.analyzed}张分析, ${imageStats.hasRisk}张有风险, ${imageStats.errors}张失败`
+          );
+        }
+        console.log("[Cron] ========== 图片分析结束 ==========");
       } catch (error) {
         console.error("[Cron] 检查过程出错:", error);
       } finally {

@@ -18,10 +18,10 @@ export default function ProjectSettingsPage() {
           variant="ghost"
           size="sm"
           className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
-          onClick={() => router.push(`/projects/${projectId}`)}
+          onClick={() => router.push(`/projects/${projectId}/documents`)}
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          返回项目详情
+          返回项目
         </Button>
         <h2 className="text-h2">项目设置</h2>
         <p className="text-muted-foreground">本项目的配置与权限（功能开发中）</p>

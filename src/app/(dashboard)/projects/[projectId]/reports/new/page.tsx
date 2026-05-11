@@ -147,7 +147,7 @@ export default function NewReportPage() {
           variant="ghost"
           size="sm"
           className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
-          onClick={() => router.push(`/projects/${projectId}`)}
+          onClick={() => router.push(`/projects/${projectId}/reports`)}
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           返回项目详情
@@ -261,7 +261,7 @@ export default function NewReportPage() {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => router.push(`/projects/${projectId}`)}
+                      onClick={() => router.push(`/projects/${projectId}/reports`)}
                     >
                       取消
                     </Button>
@@ -352,7 +352,7 @@ export default function NewReportPage() {
                 <Button variant="outline" onClick={() => setReviewStep("select")}>
                   重试
                 </Button>
-                <Button variant="outline" onClick={() => router.push(`/projects/${projectId}`)}>
+                <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/reports`)}>
                   返回
                 </Button>
               </div>

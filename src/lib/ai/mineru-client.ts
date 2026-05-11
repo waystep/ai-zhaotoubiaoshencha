@@ -252,12 +252,46 @@ export class MineruClient {
       const fileNames = Object.keys(results);
       if (fileNames.length > 0) {
         resultData = results[fileNames[0]];
-        markdown = (resultData.md_content as string) || "";
       }
     }
 
-    // 处理 content_list（主要数据源）
-    const contentList = resultData.content_list as Array<Record<string, unknown>> | undefined;
+    // 提取 markdown 内容
+    markdown = (resultData.md_content as string) || (apiResult.md_content as string) || "";
+
+    // 解析 images 数据（MinerU return_images=true 时返回，可能是 JSON 字符串）
+    let imagesData: Record<string, string> | undefined;
+    const imagesRaw = resultData.images ?? apiResult.images;
+    if (imagesRaw) {
+      if (typeof imagesRaw === "string") {
+        try {
+          imagesData = JSON.parse(imagesRaw);
+        } catch {
+          console.warn("[MinerU] images JSON 解析失败");
+        }
+      } else if (typeof imagesRaw === "object" && !Array.isArray(imagesRaw)) {
+        imagesData = imagesRaw as Record<string, string>;
+      }
+    }
+
+    if (imagesData && Object.keys(imagesData).length > 0) {
+      console.log(`[MinerU] 提取到 ${Object.keys(imagesData).length} 张图片`);
+    }
+
+    // 解析 content_list（MinerU 返回的是 JSON 字符串，需要解析）
+    const contentListRaw = resultData.content_list ?? apiResult.content_list;
+    let contentList: Array<Record<string, unknown>> | null = null;
+
+    if (contentListRaw) {
+      if (typeof contentListRaw === "string") {
+        try {
+          contentList = JSON.parse(contentListRaw);
+        } catch {
+          console.warn("[MinerU] content_list JSON 解析失败，跳过区块提取");
+        }
+      } else if (Array.isArray(contentListRaw)) {
+        contentList = contentListRaw;
+      }
+    }
 
     if (contentList && contentList.length > 0) {
       console.log("[MinerU] 使用 content_list 提取区块, 数量:", contentList.length);
@@ -267,6 +301,12 @@ export class MineruClient {
 
       for (const item of contentList) {
         const type = (item.type as string) || "text";
+
+        // 跳过 page_number 等元数据类型
+        if (type === "page_number") {
+          continue;
+        }
+
         const pageNumber = ((item.page_idx as number) || 0) + 1;
         const bboxRaw = item.bbox as [number, number, number, number] | undefined;
 
@@ -312,7 +352,7 @@ export class MineruClient {
         blockIndex++;
       }
 
-      console.log(`[MinerU] 转换完成: ${blocks.length} 个区块, ${maxPage} 页`);
+      console.log(`[MinerU] 转换完成: ${blocks.length} 个区块, ${images.length} 个图片, ${maxPage} 页`);
     }
 
     // 提取标题
@@ -332,6 +372,7 @@ export class MineruClient {
       blocks,
       tables: [],
       images,
+      imagesData,
       equations: [],
       raw: { status: "success", ...apiResult } as MineruApiResponse,
     };

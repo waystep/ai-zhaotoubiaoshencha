@@ -22,7 +22,7 @@ export const imageReviewAgent = new Agent({
 
 ## 风险类型
 
-- 企业Logo：企业标识、品牌Logo
+- LOGO：企业标识、品牌Logo
 - 其他项目名称
 
 ## 输出格式（JSON）

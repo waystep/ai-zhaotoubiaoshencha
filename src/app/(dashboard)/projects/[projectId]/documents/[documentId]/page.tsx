@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Blocks,
   CheckCircle,
@@ -93,6 +94,32 @@ interface ExtractionResult {
   summary?: {
     reviewItemsTotal: number;
     responseItemsTotal: number;
+  };
+}
+
+interface ImageRiskItem {
+  id: string;
+  imagePath: string;
+  pageNumber: number;
+  status: string;
+  hasRisk: boolean | null;
+  riskType: string | null;
+  riskText: string | null;
+  confidence: string | null;
+  reason: string | null;
+  suggestion: string | null;
+  error: string | null;
+}
+
+interface ImageRiskResult {
+  images: ImageRiskItem[];
+  stats: {
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+    hasRisk: number;
   };
 }
 
@@ -257,6 +284,10 @@ export default function DocumentDetailPage() {
     reviewItems: [],
     responseItems: [],
   });
+  const [imageRiskResult, setImageRiskResult] = useState<ImageRiskResult>({
+    images: [],
+    stats: { total: 0, pending: 0, processing: 0, completed: 0, failed: 0, hasRisk: 0 },
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isParsing, setIsParsing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -280,6 +311,20 @@ export default function DocumentDetailPage() {
       });
     } catch (error) {
       console.error("获取提取结果失败:", error);
+    }
+  }, [documentId]);
+
+  const fetchImageRiskResult = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/documents/${documentId}/images`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setImageRiskResult({
+        images: data.images ?? [],
+        stats: data.stats ?? { total: 0, pending: 0, processing: 0, completed: 0, failed: 0, hasRisk: 0 },
+      });
+    } catch (error) {
+      console.error("获取图片风险分析失败:", error);
     }
   }, [documentId]);
 
@@ -310,6 +355,10 @@ export default function DocumentDetailPage() {
         if (data.document?.parseStatus === "completed") {
           void fetchFullParsedResult();
           void fetchExtractionResult();
+          // 投标文件才需要图片风险分析
+          if (data.document?.docType === "bid_doc") {
+            void fetchImageRiskResult();
+          }
         }
         if (data.document?.parseStatus === "processing") {
           setIsParsing(true);
@@ -320,7 +369,7 @@ export default function DocumentDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [documentId, fetchExtractionResult, fetchFullParsedResult]);
+  }, [documentId, fetchExtractionResult, fetchFullParsedResult, fetchImageRiskResult]);
 
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) {
@@ -345,6 +394,10 @@ export default function DocumentDetailPage() {
           setParsedResult(data.parsedResult);
           void fetchFullParsedResult();
           void fetchExtractionResult();
+          // 投标文件才需要图片风险分析
+          if (data.document?.docType === "bid_doc") {
+            void fetchImageRiskResult();
+          }
           toast({
             title: "解析完成",
             description: `共 ${data.parsedResult?.totalPages ?? 0} 页，${data.parsedResult?.blocks?.length ?? 0} 个区块`,
@@ -362,7 +415,7 @@ export default function DocumentDetailPage() {
         console.error("轮询解析状态失败:", error);
       }
     }, 3000);
-  }, [documentId, fetchExtractionResult, fetchFullParsedResult, stopPolling, toast]);
+  }, [documentId, fetchExtractionResult, fetchFullParsedResult, fetchImageRiskResult, stopPolling, toast]);
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
@@ -417,7 +470,7 @@ export default function DocumentDetailPage() {
           title: "删除成功",
           description: "文档已删除",
         });
-        router.push(`/projects/${projectId}`);
+        router.push(`/projects/${projectId}/documents`);
       } else {
         const error = await response.json();
         toast({
@@ -499,7 +552,7 @@ export default function DocumentDetailPage() {
         <CardContent className="flex flex-col items-center justify-center py-12">
           <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
           <h3 className="mb-2 text-h5">文档不存在</h3>
-          <Button onClick={() => router.push(`/projects/${projectId}`)}>返回项目详情</Button>
+          <Button onClick={() => router.push(`/projects/${projectId}/documents`)}>返回文档列表</Button>
         </CardContent>
       </Card>
     );
@@ -521,10 +574,10 @@ export default function DocumentDetailPage() {
           variant="ghost"
           size="sm"
           className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
-          onClick={() => router.push(`/projects/${projectId}`)}
+          onClick={() => router.push(`/projects/${projectId}/documents`)}
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          返回项目详情
+          返回文档列表
         </Button>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -646,11 +699,22 @@ export default function DocumentDetailPage() {
             </CardHeader>
             <CardContent className="min-h-0">
               <Tabs defaultValue="blocks" className="min-h-0">
-                <TabsList className={shouldShowExtractedTab ? "grid w-full grid-cols-2" : "grid w-full grid-cols-1"}>
+                <TabsList className={document.docType === "bid_doc" ? "grid w-full grid-cols-2" : (shouldShowExtractedTab ? "grid w-full grid-cols-2" : "grid w-full grid-cols-1")}>
                   <TabsTrigger value="blocks" className="gap-1">
                     <Blocks className="h-4 w-4" />
                     区块详情
                   </TabsTrigger>
+                  {document.docType === "bid_doc" ? (
+                    <TabsTrigger value="imageRisks" className="gap-1">
+                      <AlertTriangle className="h-4 w-4" />
+                      图片风险
+                      {imageRiskResult.stats.hasRisk > 0 ? (
+                        <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-xs">
+                          {imageRiskResult.stats.hasRisk}
+                        </Badge>
+                      ) : null}
+                    </TabsTrigger>
+                  ) : null}
                   {shouldShowExtractedTab ? (
                     <TabsTrigger value="extracted" className="gap-1">
                       <FileText className="h-4 w-4" />
@@ -708,6 +772,92 @@ export default function DocumentDetailPage() {
                     ))}
                   </Accordion>
                 </TabsContent>
+
+                {document.docType === "bid_doc" ? (
+                  <TabsContent value="imageRisks" className="mt-4">
+                    <div className="mb-3 grid grid-cols-3 gap-2 text-xs">
+                      <div className="rounded-md bg-muted/50 p-2">
+                        <div className="text-muted-foreground">总图片</div>
+                        <div className="text-h5">{imageRiskResult.stats.total}</div>
+                      </div>
+                      <div className="rounded-md bg-muted/50 p-2">
+                        <div className="text-muted-foreground">已完成</div>
+                        <div className="text-h5">{imageRiskResult.stats.completed}</div>
+                      </div>
+                      <div className="rounded-md bg-red-50 p-2">
+                        <div className="text-red-600">有风险</div>
+                        <div className="text-h5 text-red-600">{imageRiskResult.stats.hasRisk}</div>
+                      </div>
+                    </div>
+                    {imageRiskResult.images.length === 0 ? (
+                      <div className="rounded-md border border-dashed p-4">
+                        <div className="text-sm font-medium">暂无图片风险分析</div>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          文档解析完成后，系统将自动分析图片中的潜在风险（如企业Logo、水印等）。
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="max-h-[calc(100vh-14rem)] space-y-2 overflow-y-auto pr-1">
+                        {imageRiskResult.images.map((image) => (
+                          <div
+                            key={image.id}
+                            className="rounded-md border bg-background p-3"
+                          >
+                            <div className="mb-2 flex items-center gap-2">
+                              <FileImage className="h-4 w-4 text-muted-foreground" />
+                              <Badge variant="outline">P.{image.pageNumber}</Badge>
+                              {image.status === "pending" ? (
+                                <Badge variant="secondary" className="text-xs">待分析</Badge>
+                              ) : image.status === "processing" ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  分析中
+                                </Badge>
+                              ) : image.status === "failed" ? (
+                                <Badge variant="destructive" className="text-xs">失败</Badge>
+                              ) : image.hasRisk ? (
+                                <Badge variant="destructive" className="text-xs gap-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  有风险
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-emerald-600">无风险</Badge>
+                              )}
+                            </div>
+                            {image.status === "completed" && image.hasRisk ? (
+                              <div className="space-y-1 text-sm">
+                                <div className="flex gap-2">
+                                  <span className="text-muted-foreground">风险类型:</span>
+                                  <span className="font-medium">{image.riskType}</span>
+                                </div>
+                                {image.riskText ? (
+                                  <div className="flex gap-2">
+                                    <span className="text-muted-foreground">风险文字:</span>
+                                    <span className="font-medium">{image.riskText}</span>
+                                  </div>
+                                ) : null}
+                                {image.confidence ? (
+                                  <div className="flex gap-2">
+                                    <span className="text-muted-foreground">置信度:</span>
+                                    <span>{Number(image.confidence) <= 1 ? `${Math.round(Number(image.confidence) * 100)}%` : `${Math.round(Number(image.confidence))}%`}</span>
+                                  </div>
+                                ) : null}
+                                {image.reason ? (
+                                  <p className="mt-1 text-muted-foreground">{image.reason}</p>
+                                ) : null}
+                              </div>
+                            ) : image.status === "failed" ? (
+                              <p className="text-sm text-red-600">{image.error}</p>
+                            ) : null}
+                            <div className="mt-2 text-xs text-muted-foreground truncate">
+                              {image.imagePath}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                ) : null}
 
                 {shouldShowExtractedTab ? (
                   <TabsContent value="extracted" className="mt-4">
