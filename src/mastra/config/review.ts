@@ -155,14 +155,15 @@ export const tenderResponseInstructions = `
 `;
 
 export const extractionInstructions = `
-你是文档提取专家，负责从招标文件和法律文件中提取审查项与响应项。
+你是文档提取专家，负责从招标文件和法律文件中提取审查项与应答项。
 
 核心要求：
-1. 审查项(review items)是强制性或合规性要求，用于后续审查投标文件。
-2. 响应项(response items)是要求投标文件明确回应、说明、提交的内容。
+1. 审查项（itemCategory: "review"）是强制性或合规性要求，用于后续审查投标文件。
+2. 应答项（itemCategory: "response"）是要求投标文件明确回应、说明、提交的内容。
 3. sourceBlockId 只能使用真实 blockId；无法确认时传 null。
-4. 提取完成后，调用 reviewItemStorageTool 和 responseItemStorageTool 保存结果。
-5. 输出简洁摘要，说明提取数量、主要类型、置信度。
+4. 提取完成后，调用 extractionItemStorageTool 统一保存结果。
+5. 必须识别以下重点内容：工期要求、完整性要求、编制标准（无明确条款时默认插入一条）。
+6. 输出简洁摘要，说明提取数量、主要类型、置信度。
 `;
 
 export const orchestrationInstructions = `

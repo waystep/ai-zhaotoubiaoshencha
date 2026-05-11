@@ -102,6 +102,12 @@ export const extractionStatusEnum = pgEnum("extraction_status", [
   "failed",        // 提取失败
 ]);
 
+// 提取项类别（统一审查项和应答项）
+export const extractionItemCategoryEnum = pgEnum("extraction_item_category", [
+  "review",        // 审查项（强制性/合规性要求）
+  "response",      // 应答项（要求投标人明确说明/提交的内容）
+]);
+
 // 投标状态
 export const bidStatusEnum = pgEnum("bid_status", [
   "draft",         // 草稿
@@ -275,8 +281,9 @@ export const documents = pgTable("documents", {
   extractedAt: timestamp("extracted_at"),
   extractionTaskId: varchar("extraction_task_id", { length: 100 }),
   extractionProgress: integer("extraction_progress").default(0),
-  reviewItemsCount: integer("review_items_count").default(0),
-  responseItemsCount: integer("response_items_count").default(0),
+  reviewItemsCount: integer("review_items_count").default(0),   // @deprecated 使用 extractionItemsCount
+  responseItemsCount: integer("response_items_count").default(0), // @deprecated 使用 extractionItemsCount
+  extractionItemsCount: integer("extraction_items_count").default(0),
   autoExtract: boolean("auto_extract").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -556,6 +563,80 @@ export const responseItems = pgTable("response_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// 统一提取项表 - 合并审查项和应答项（替代 review_items 和 response_items）
+export const extractionItems = pgTable("extraction_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => tenderProjects.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  sourceBlockId: uuid("source_block_id")
+    .references(() => documentBlocks.id, { onDelete: "set null" }),
+
+  // 类别：审查项(review) 或 应答项(response)
+  itemCategory: extractionItemCategoryEnum("item_category").notNull(),
+
+  // 基本信息
+  itemType: varchar("item_type", { length: 100 }).notNull(),
+  itemNo: varchar("item_no", { length: 100 }),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description").notNull(),
+
+  // 原文定位
+  location: jsonb("location").notNull().default({
+    pageNumber: 0,
+    blockIndex: 0,
+    bbox: { x0: 0, y0: 0, x1: 0, y1: 0 },
+    textSnippet: "",
+    highlightText: "",
+  }),
+
+  // 审查项专用字段（itemCategory="review"时使用）
+  requirements: jsonb("requirements").default({}),
+  consequence: varchar("consequence", { length: 100 }),
+  legalReference: text("legal_reference"),
+
+  // 应答项专用字段（itemCategory="response"时使用）
+  responseRequirements: jsonb("response_requirements").default({}),
+  scoringInfo: jsonb("scoring_info").default({}),
+
+  // 提取元数据
+  extractionStatus: extractionStatusEnum("extraction_status").default("completed"),
+  extractedBy: varchar("extracted_by", { length: 100 }),
+  extractionConfidence: decimal("extraction_confidence", { precision: 5, scale: 2 }),
+  extractionMetadata: jsonb("extraction_metadata").default({}),
+
+  // 验证状态
+  isVerified: boolean("is_verified").default(false),
+  verifiedBy: uuid("verified_by").references(() => users.id),
+  verifiedAt: timestamp("verified_at"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// 文档页面嵌入表 - 用于RAG语义搜索
+export const documentPageEmbeddings = pgTable("document_page_embeddings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  parsedResultId: uuid("parsed_result_id")
+    .notNull()
+    .references(() => documentParsedResults.id, { onDelete: "cascade" }),
+  pageNumber: integer("page_number").notNull(),
+  // 该页所有block合并后的文本
+  pageText: text("page_text").notNull(),
+  // 关联的block ID列表，用于回溯定位
+  blockIds: jsonb("block_ids").notNull().default([]),
+  // 嵌入向量（JSON数组）
+  embedding: jsonb("embedding").notNull(),
+  embeddingModel: varchar("embedding_model", { length: 100 }).default("text-embedding-3-small"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ==================== 投标记录 ====================
 
 export const bidSubmissions = pgTable("bid_submissions", {
@@ -693,6 +774,7 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
   reviewReports: many(reviewReports),
   reviewItems: many(reviewItems),
   responseItems: many(responseItems),
+  extractionItems: many(extractionItems),
   imageRiskAnalysis: many(imageRiskAnalysis),
 }));
 
@@ -755,6 +837,25 @@ export const imageRiskAnalysisRelations = relations(imageRiskAnalysis, ({ one })
   }),
   verifier: one(users, {
     fields: [imageRiskAnalysis.verifiedBy],
+    references: [users.id],
+  }),
+}));
+
+export const extractionItemsRelations = relations(extractionItems, ({ one }) => ({
+  document: one(documents, {
+    fields: [extractionItems.documentId],
+    references: [documents.id],
+  }),
+  project: one(tenderProjects, {
+    fields: [extractionItems.projectId],
+    references: [tenderProjects.id],
+  }),
+  sourceBlock: one(documentBlocks, {
+    fields: [extractionItems.sourceBlockId],
+    references: [documentBlocks.id],
+  }),
+  verifier: one(users, {
+    fields: [extractionItems.verifiedBy],
     references: [users.id],
   }),
 }));

@@ -1,8 +1,7 @@
-// 文档提取智能体 - 从招标文件和法律文件中提取审查项和响应项
+// 文档提取智能体 - 从招标文件和法律文件中提取审查项和响应项（统一模型）
 import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
-import { reviewItemStorageTool } from "../tools/review-item-storage-tool";
-import { responseItemStorageTool } from "../tools/response-item-storage-tool";
+import { extractionItemStorageTool } from "../tools/extraction-item-storage-tool";
 import { documentReaderTool } from "../tools/document-reader-tool";
 import {
   extractionInstructions,
@@ -14,218 +13,105 @@ import { pgStore, pgVector } from "../storage";
 export const extractionAgent = new Agent({
   id: "extraction-agent",
   name: "文档提取专家",
-  description: `从招标文件和法律文件中提取审查项和响应项。
+  description: `从招标文件和法律文件中提取审查项和应答项，统一存储到 extraction_items 表。
 
 输入要求：
 - projectId: 项目ID
 - documentId: 文档ID
 - docType: 文档类型(tender_doc/legal_doc/bid_doc)
 
-输出格式：
-{
-  "success": true,
-  "documentId": "...",
-  "reviewItems": [
-    {
-      "itemType": "资质要求",
-      "itemNo": "第三章第5条",
-      "title": "投标人资质等级要求",
-      "description": "...",
-      "location": { "pageNumber": 5, "blockIndex": 12 },
-      "consequence": "废标",
-      "legalReference": "..."
-    }
-  ],
-  "responseItems": [
-    {
-      "responseType": "技术方案",
-      "title": "施工技术方案要求",
-      "description": "...",
-      "location": { ... }
-    }
-  ],
-  "summary": "提取完成，发现审查项15个，响应项20个"
-}
+输出格式：统一使用 extractionItemStorageTool 存储，通过 itemCategory 区分 review/response。
 
-使用时机：文档解析完成后，提取结构化审查项和响应项。
+使用时机：文档解析完成后，提取结构化审查项和应答项。
 
 ⚠️ **重要约束**：
-- sourceBlockId字段必须为null或留空，不要生成虚假的block ID
-- 如果不确定block ID，传递null即可，系统会根据location信息处理
-- 随机生成的block ID会导致数据库外键约束错误
+- sourceBlockId 字段必须为 null 或留空
+- 如果不确定 block ID，传递 null 即可
 `,
   instructions: `${extractionInstructions}
 
 ## 提取策略
 
-### 一、招标文件（tender_doc）
+### 提取流程
 
-**提取内容**：审查项 + 响应项
+#### Step 1: 读取文档
+使用 documentReaderTool 读取文档 blocks，了解整体结构。
 
-**提取流程**：
+#### Step 2: 遍历 blocks，识别条款
+识别条款编号模式：第X章、第X条、X.X、X.X.X、(一)(二)、一/二/三
 
-#### Step 1: 识别章节结构
-使用 documentReaderTool 读取文档blocks，识别关键章节：
-- **资质要求章节** → 提取审查项（资质要求）
-- **技术规范章节** → 提取审查项（技术要求）+ 响应项（技术方案）
-- **评分标准章节** → 提取响应项（评分要求）
-- **合同条款章节** → 提取审查项（法律条款、风险条款）
-- **废标条款章节** → 提取审查项（关键条款）
+#### Step 3: 分类提取 — 使用 itemCategory 区分
 
-#### Step 2: 遍历blocks，提取条款
-识别条款编号模式：
-- 第X章、第X条（第一章、第一条）
-- X.X、X.X.X（3.1、3.1.1）
-- (一)、(二)、(1)、(2)
-- 一、二、三
-
-对每个条款进行判断：
-
-**判断为审查项的条件**：
+**审查项（itemCategory: "review"）** — 强制性/合规性要求：
 - 包含强制性关键词："必须"、"应当"、"不得"、"强制性"、"必须满足"
 - 包含后果描述："废标"、"不予受理"、"取消投标资格"、"违规"、"违法"
 - 提出门槛要求：资质等级、注册资本、业绩要求、人员配置要求
 - 法律责任条款：违约责任、赔偿责任、法律责任
 
-**判断为响应项的条件**：
-- 要求投标人说明："投标人应提供"、"需提交"、"应编制"
-- 响应内容要求："技术方案"、"施工方案"、"人员配置"、"设备清单"
+**应答项（itemCategory: "response"）** — 要求投标人明确说明/提交：
+- 要求投标人说明/提交/编制的内容
 - 评分相关："评分标准"、"分值"、"权重"
 - 格式要求："文字说明"、"表格"、"图纸"、"证明材料"
 
-#### Step 3: 提取详细信息
+#### Step 4: 存储结果
+统一调用 extractionItemStorageTool，传递 items 数组，每项的 itemCategory 区分类型。
 
-**审查项信息**：
-- itemType：类型文本（资质要求、技术要求、合规要求、法律条款、风险条款、关键条款等）
-- itemNo：条款编号
-- title：条款标题
-- description：详细内容描述
-- location：精确定位（页码、区块索引、bbox坐标、文本片段）
-- **sourceBlockId**：**必须传递null或留空！不要生成虚假的block ID**
-  - 原因：sourceBlockId需要关联到真实的documentBlocks记录
-  - 如果不确定block ID，请传递null，系统会根据location信息后续关联
-  - 不要随机生成block ID，会导致外键约束错误
-- requirements：要求详情（强制性、门槛值、具体标准、证明材料）
-- consequence：不满足后果（废标、违规、违法、扣分等）
-- legalReference：法律依据
+**重要**：传递给工具的 items 参数必须是数组，不是字符串。
 
-**响应项信息**：
-- responseType：类型文本（技术方案、人员配置、设备清单、服务方案、质量保证、报价说明、进度计划、安全措施等）
-- itemNo：条款编号
-- title：条款标题
-- description：详细内容描述
-- location：精确定位
-- **sourceBlockId**：**必须传递null或留空！不要生成虚假的block ID**
-- responseRequirements：响应要求（格式、内容列表、字数要求、附件列表）
-- scoringInfo：评分信息（权重、评分标准）
+## 必须识别的重点内容
 
-#### Step 4: 存储提取结果
-使用 reviewItemStorageTool 和 responseItemStorageTool 存储到数据库。
+### 1. 工期要求（itemType: "工期要求", itemCategory: "review"）
+识别所有关于工期的条款：
+- 总工期天数（如"工期300日历天"、"计划工期XX天"）
+- 开工日期和竣工日期要求
+- 关键节点时间要求（如"主体结构封顶时间不得晚于..."）
+- 工期延误的处罚条款（违约金计算方式、每日罚款金额）
+- 工期提前的奖励条款
 
-**重要提示**：
-- 传递给工具的参数必须是**纯JSON对象**，不要将数组或对象转换为字符串
-- reviewItems和responseItems参数必须是**数组类型**，直接传递提取结果的数组
+提取每个工期相关条款为独立的审查项。
 
-正确的调用示例：
-调用reviewItemStorageTool时，传递对象参数：
-- projectId: 项目ID字符串
-- documentId: 文档ID字符串
-- reviewItems: 直接传递数组（不是字符串）
+### 2. 完整性要求（itemType: "完整性要求", itemCategory: "review"）
+识别提醒投标人确保投标文件完整性的提示：
+- "投标人应仔细阅读招标文件的全部内容"
+- "投标人应对所有条款进行响应和承诺"
+- "未响应视为不响应招标文件要求"
+- "投标人须知"或"投标人承诺"类章节中的完整性条款
+- 要求逐条响应的提示性文字
 
-示例结构：
+### 3. 编制标准（itemType: "编制标准", itemCategory: "review"）
+识别引用的编制标准和规范：
+- 国家标准（GB系列）、行业标准、地方标准
+- 要求投标文件编制需遵循的标准和规范
+
+**⚠️ 重要：即使招标文件中没有明确提及编制标准，也必须默认提取一条**：
 {
-  projectId: "...",
-  documentId: "...",
-  reviewItems: [
-    { itemType: "资质要求", itemNo: "第三章第5条", ... }
-  ]
+  itemCategory: "review",
+  itemType: "编制标准",
+  title: "投标文件编制应符合相关法律法规和标准规范",
+  description: "投标文件应按照国家及行业现行有关标准、规范、规程编制，包括但不限于相关施工规范、质量验收标准、安全操作规程等。投标人应确保其投标文件内容符合上述标准的最新版本要求。",
+  consequence: "废标",
+  extractionConfidence: 0.6
 }
-
-错误示例（不要这样做）：
-{
-  reviewItems: "字符串化的JSON"  // 错误！
-}
-
-### 二、法律文件（legal_doc）
-
-**提取内容**：只提取审查项（法律合规条款）
-
-**提取重点**：
-- 违约责任条款 → 审查项（风险条款）
-- 付款条款 → 审查项（法律条款）
-- 保修条款 → 审查项（法律条款）
-- 争议解决条款 → 审查项（法律条款）
-- 法律责任条款 → 审查项（关键条款）
-
-**特别注意**：
-- 明确标注后果（违约金、法律责任等）
-- 引用具体法律条文
-- 记录门槛值和风险点
-
-### 三、投标文件（bid_doc）
-
-**提取内容**：暂不提取
-
-**用途**：
-- 审查时验证是否符合审查项要求
-- 评估响应度时验证是否响应了响应项要求
 
 ## 提取方法
 
-### 语义理解识别
-使用AI语义理解识别条款，不只是依赖关键词：
+### 语义理解
+使用AI语义理解识别条款，不仅依赖关键词：
 - 理解条款的语义含义
 - 判断条款的性质（强制要求 vs 响应要求）
 - 提取完整的条款内容
 
-### 结构化解析
-解析条款结构：
-- 识别编号、标题、正文
-- 处理嵌套结构（章节、条款、子条款）
-- 解析表格内容（评分表、资质表）
-
-### 后果识别
-识别不满足审查项的后果：
-- 废标类关键词："废标"、"不予受理"、"取消投标资格"、"拒绝投标"
-- 违规类关键词："违规"、"违法"、"法律责任"、"行政处罚"
-- 扣分类关键词："扣分"、"扣除"、"降低评分"、"影响评分"
-- 否决类关键词："否决"、"否决投标"、"不予通过"
-
 ### 置信度计算
-基于提取质量计算置信度（0-1）：
 - 有明确条款编号 +0.1
 - 有明确标题 +0.05
 - 有完整描述（>50字） +0.05
 - 有明确后果 +0.05
 - 有法律依据 +0.05
 - 基础置信度 0.7
-
 低置信度（<0.8）项需人工验证。
 
-## 输出格式
-
-最终返回提取结果：
-{
-  "success": true,
-  "documentId": "...",
-  "reviewItems": [审查项列表],
-  "responseItems": [响应项列表],
-  "summary": "提取摘要"
-}
-
-使用存储工具保存结果，并更新文档extractionStatus为completed。
-
 ## 类型灵活性
-
-**重要**：itemType和responseType使用文本类型，支持任意自定义值！
-
-不要使用固定枚举，根据文档内容灵活命名：
-- 工程类招标：资质要求、技术参数、质量标准、安全要求等
-- 服务类招标：服务能力、服务人员、服务方案等
-- 采购类招标：产品规格、供货能力、售后服务等
-- 法律文件：违约责任、付款条款、保修条款等
-
-根据实际内容命名，保持灵活性！
+itemType 使用文本类型，根据文档内容灵活命名：资质要求、技术参数、工期要求、完整性要求、编制标准、违约责任等。
 `,
   model: reviewModelConfig.defaultModel,
   memory: new Memory({
@@ -243,7 +129,6 @@ export const extractionAgent = new Agent({
   }),
   tools: {
     documentReaderTool,
-    reviewItemStorageTool,
-    responseItemStorageTool,
+    extractionItemStorageTool,
   },
 });

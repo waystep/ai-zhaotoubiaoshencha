@@ -289,6 +289,13 @@ export async function GET(
 
           console.log(`[Parse] 结果存储完成`);
 
+          // 后台生成页面嵌入（fire-and-forget，不阻塞响应）
+          import("@/lib/ai/embedding").then((mod) => {
+            mod.generatePageEmbeddings(documentId)
+              .then((n) => console.log(`[Parse] 嵌入生成完成: ${n} 页`))
+              .catch((e) => console.error(`[Parse] 嵌入生成失败:`, e));
+          });
+
           // 返回完成结果
           return NextResponse.json({
             document: {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db/client";
-import { documents, reviewItems, responseItems } from "@/lib/db/schema";
+import { documents, extractionItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { mastra } from "@/mastra";
 
@@ -174,22 +174,17 @@ export async function GET(
       return NextResponse.json({ error: "文档不存在" }, { status: 404 });
     }
 
-    // 查询提取结果
-    const reviewItemsData = await db.query.reviewItems.findMany({
-      where: eq(reviewItems.documentId, documentId),
-      limit: 100,
+    // 查询提取结果（统一表）
+    const items = await db.query.extractionItems.findMany({
+      where: eq(extractionItems.documentId, documentId),
+      limit: 200,
       with: {
         sourceBlock: true,
       },
     });
 
-    const responseItemsData = await db.query.responseItems.findMany({
-      where: eq(responseItems.documentId, documentId),
-      limit: 100,
-      with: {
-        sourceBlock: true,
-      },
-    });
+    const reviewItemsData = items.filter((i) => i.itemCategory === "review");
+    const responseItemsData = items.filter((i) => i.itemCategory === "response");
 
     return NextResponse.json({
       document: {
@@ -199,16 +194,25 @@ export async function GET(
         extractionStatus: doc.extractionStatus,
         extractionError: doc.extractionError,
         extractedAt: doc.extractedAt,
-        reviewItemsCount: doc.reviewItemsCount,
-        responseItemsCount: doc.responseItemsCount,
+        extractionItemsCount: doc.extractionItemsCount,
       },
-      reviewItems: reviewItemsData,
-      responseItems: responseItemsData,
+      // 向后兼容：保留 reviewItems / responseItems 字段名，前端暂时不用改
+      reviewItems: reviewItemsData.map((i) => ({
+        ...i,
+        itemType: i.itemType,
+        responseType: i.itemCategory === "response" ? i.itemType : undefined,
+      })),
+      responseItems: responseItemsData.map((i) => ({
+        ...i,
+        responseType: i.itemType,
+        itemType: i.itemCategory === "review" ? i.itemType : undefined,
+      })),
+      items,
       summary: {
-        reviewItemsTotal: reviewItemsData.length,
-        responseItemsTotal: responseItemsData.length,
-        reviewItemTypes: [...new Set(reviewItemsData.map(item => item.itemType))],
-        responseItemTypes: [...new Set(responseItemsData.map(item => item.responseType))],
+        total: items.length,
+        reviewTotal: reviewItemsData.length,
+        responseTotal: responseItemsData.length,
+        itemTypes: [...new Set(items.map((i) => i.itemType))],
       },
     });
   } catch (error) {
