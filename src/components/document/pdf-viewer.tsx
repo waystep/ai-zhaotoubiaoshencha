@@ -325,9 +325,9 @@ export function PdfViewer({
         return;
       }
 
-      const refs = pageRefDims.current.get(issue.pageNumber);
-      const refW = refs?.w ?? pageBaseDims.w;
-      const refH = refs?.h ?? pageBaseDims.h;
+      // MinerU bbox 归一化到 0-1000
+      const refW = 1000;
+      const refH = 1000;
       const mapped = mapBoxToOverlay(box, refW, refH, overlaySize.w, overlaySize.h);
 
       // 目标：将 bbox 垂直居中到容器可视区域偏上（更符合阅读）
@@ -473,10 +473,9 @@ export function PdfViewer({
     const pageBlocks = blocksByPage.get(pageNum) ?? [];
     const rW = overlaySize!.w;
     const rH = overlaySize!.h;
-    // bbox 参考系用本页 PDF 原始尺寸
-    const refs = pageRefDims.current.get(pageNum);
-    const refW = refs?.w ?? pageBaseDims!.w;
-    const refH = refs?.h ?? pageBaseDims!.h;
+    // MinerU _build_bbox 将坐标归一化到 0-1000 范围
+    const refW = 1000;
+    const refH = 1000;
 
     return (
       <>
