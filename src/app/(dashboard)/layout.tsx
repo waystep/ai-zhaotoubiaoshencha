@@ -105,6 +105,11 @@ export default function DashboardLayout({
           href: `/projects/${selectedProjectId}/reports`,
           icon: ClipboardCheck,
         },
+        {
+          name: "审查项管理",
+          href: `/projects/${selectedProjectId}/extraction-items`,
+          icon: FileText,
+        },
       ]
     : [];
 

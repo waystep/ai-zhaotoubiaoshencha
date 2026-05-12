@@ -806,12 +806,6 @@ export default function DocumentDetailPage() {
                         <div className="text-h5">{extractionResult.summary?.responseTotal ?? extractionResult.responseItems.length}</div>
                       </div>
                     </div>
-                    <ExtractionItemManager
-                      documentId={documentId}
-                      projectId={projectId}
-                      items={extractionResult.items as any}
-                      onRefresh={fetchExtractionResult}
-                    />
                     {totalExtracted === 0 ? (
                       <div className="mb-4 rounded-md border border-dashed p-4">
                         <div className="text-sm font-medium">暂无已提取信息</div>
