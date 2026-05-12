@@ -118,6 +118,8 @@ export function PdfViewer({
   const scrollRef = useRef<HTMLDivElement>(null);
   // Map from page number → DOM element for scrollIntoView
   const pageEls = useRef<Map<number, HTMLDivElement>>(new Map());
+  // Per-page actual rendered dimensions (offsetWidth/Height)
+  const pageDims = useRef<Map<number, { w: number; h: number }>>(new Map());
   const lastIoPageRef = useRef(0);
   const widthRafRef = useRef<number | null>(null);
   const lastWidthRef = useRef(0);
@@ -452,6 +454,11 @@ export function PdfViewer({
     if (allIssues.length === 0) return null;
 
     const pageBlocks = blocksByPage.get(pageNum) ?? [];
+    // 使用本页实际渲染尺寸，确保 bbox 映射精确
+    const dims = pageDims.current.get(pageNum);
+    const rW = dims?.w ?? overlaySize!.w;
+    const rH = dims?.h ?? overlaySize!.h;
+    // bbox 参考系用 PDF 页面原始尺寸
     const refW = pageBaseDims!.w;
     const refH = pageBaseDims!.h;
 
@@ -460,7 +467,7 @@ export function PdfViewer({
         {/* 视觉层：完全不接收事件 */}
         <div
           className="pointer-events-none absolute left-0 top-0 z-10"
-          style={{ width: overlaySize.w, height: overlaySize.h }}
+          style={{ width: rW, height: rH }}
         >
           {allIssues.map((issue, idx) => {
             const box = boxForIssue(issue, pageBlocks);
@@ -469,8 +476,8 @@ export function PdfViewer({
               box,
               refW,
               refH,
-              overlaySize.w,
-              overlaySize.h,
+              rW,
+              rH,
               2
             );
             const focused = isFocused(issue);
@@ -501,7 +508,7 @@ export function PdfViewer({
         {/* 命中层：只负责 hover 联动，不影响视觉（透明） */}
         <div
           className="absolute left-0 top-0 z-20"
-          style={{ width: overlaySize.w, height: overlaySize.h }}
+          style={{ width: rW, height: rH }}
         >
           {allIssues.map((issue, idx) => {
             const box = boxForIssue(issue, pageBlocks);
@@ -510,8 +517,8 @@ export function PdfViewer({
               box,
               refW,
               refH,
-              overlaySize.w,
-              overlaySize.h,
+              rW,
+              rH,
               2
             );
             return (
@@ -658,8 +665,13 @@ export function PdfViewer({
                       <div
                         key={pageNum}
                         ref={(el) => {
-                          if (el) pageEls.current.set(pageNum, el);
-                          else pageEls.current.delete(pageNum);
+                          if (el) {
+                            pageEls.current.set(pageNum, el);
+                            pageDims.current.set(pageNum, { w: el.offsetWidth, h: el.offsetHeight });
+                          } else {
+                            pageEls.current.delete(pageNum);
+                            pageDims.current.delete(pageNum);
+                          }
                         }}
                         data-page={pageNum}
                         className="relative shrink-0 shadow-sm"
