@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PdfViewer } from "@/components/document/pdf-viewer";
+import { PdfViewer, type IssueLocation } from "@/components/document/pdf-viewer";
 import { useToast } from "@/hooks/use-toast";
 
 interface ParsedBlock {
@@ -81,6 +81,7 @@ interface ExtractedItem {
   location?: {
     pageNumber?: number;
     blockIndex?: number;
+    bbox?: { x0: number; y0: number; x1: number; y1: number } | null;
   };
 }
 
@@ -214,6 +215,7 @@ export default function DocumentDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [focusedIssue, setFocusedIssue] = useState<IssueLocation | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasFetchedRef = useRef(false);
 
@@ -774,8 +776,31 @@ export default function DocumentDetailPage() {
                         const pageNumber = item.location?.pageNumber ?? item.sourceBlock?.pageNumber;
                         const blockIndex = item.location?.blockIndex ?? item.sourceBlock?.blockIndex;
                         const confidence = confidenceLabel(item.extractionConfidence);
+                        const locPage = item.location?.pageNumber ?? item.sourceBlock?.pageNumber ?? 0;
+                        const locIdx = item.location?.blockIndex ?? item.sourceBlock?.blockIndex ?? 0;
+                        const locBbox = item.location?.bbox ?? item.sourceBlock?.bbox;
+                        const canLocate = locPage > 0;
+
                         return (
-                          <div key={item.id} className="rounded-md border bg-background p-3">
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={!canLocate}
+                            className={`w-full rounded-md border bg-background p-3 text-left transition-colors ${
+                              canLocate ? "hover:border-primary/40 hover:bg-muted/40 cursor-pointer" : ""
+                            }`}
+                            onClick={() => {
+                              if (!canLocate) return;
+                              setCurrentPage(locPage);
+                              setFocusedIssue({
+                                pageNumber: locPage,
+                                blockIndex: locIdx,
+                                bbox: locBbox || undefined,
+                                textSnippet: item.title,
+                              });
+                            }}
+                            title={canLocate ? "点击定位到原文" : "无定位信息"}
+                          >
                             <div className="mb-2 flex flex-wrap items-center gap-2">
                               <Badge variant={isReview ? "destructive" : "secondary"}>
                                 {isReview ? "审查项" : "应答项"}
@@ -814,7 +839,7 @@ export default function DocumentDetailPage() {
                                 依据：{item.legalReference}
                               </p>
                             ) : null}
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -835,8 +860,10 @@ export default function DocumentDetailPage() {
                   <PdfViewer
                     documentId={documentId}
                     blocks={parsedResult.blocks}
+                    focusedIssue={focusedIssue}
                     currentPage={currentPage}
                     onPageChange={setCurrentPage}
+                    onFocusedIssueConsumed={() => setFocusedIssue(null)}
                   />
                 </TabsContent>
                 <TabsContent value="content" className="mt-0">
