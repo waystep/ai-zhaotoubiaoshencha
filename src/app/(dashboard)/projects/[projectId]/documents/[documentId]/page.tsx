@@ -946,6 +946,7 @@ export default function DocumentDetailPage() {
                 blocks={parsedResult.blocks}
                 focusedIssue={focusedIssue}
                 activePopover={activePopover}
+                onDismissPopover={() => setActivePopover(null)}
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
                 onFocusedIssueConsumed={() => { setFocusedBlock(null); setItemFocus(null); setActivePopover(null); }}

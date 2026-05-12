@@ -57,6 +57,7 @@ interface PdfViewerProps {
   currentPage?: number;
   onPageChange?: (pageNumber: number) => void;
   activePopover?: { title: string; desc: string; consequence?: string; legalRef?: string; page: number; blockIdx: number } | null;
+  onDismissPopover?: () => void;
 }
 
 function mapBoxToOverlay(
@@ -94,6 +95,7 @@ export function PdfViewer({
   currentPage,
   onPageChange,
   activePopover,
+  onDismissPopover,
 }: PdfViewerProps) {
   const issueKey = useCallback((loc: IssueLocation) => `${loc.pageNumber}-${loc.blockIndex}`, []);
   const fileUrl = useMemo(() => `/api/documents/${documentId}/file`, [documentId]);
@@ -531,7 +533,7 @@ export function PdfViewer({
               >
                 <button
                   className="absolute right-1 top-1 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => { /* will be handled by parent */ }}
+                  onClick={(e) => { e.stopPropagation(); onDismissPopover?.(); }}
                 >x</button>
                 <div className="font-semibold text-foreground mb-1">{activePopover.title}</div>
                 <p className="text-xs text-muted-foreground leading-5">{activePopover.desc}</p>
