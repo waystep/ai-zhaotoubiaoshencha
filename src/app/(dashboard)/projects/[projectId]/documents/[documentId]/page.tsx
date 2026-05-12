@@ -669,6 +669,10 @@ export default function DocumentDetailPage() {
                             className="w-full rounded-md border bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
                             onClick={() => {
                               setCurrentPage(image.pageNumber);
+                              setFocusedIssue({
+                                pageNumber: image.pageNumber,
+                                blockIndex: -1,
+                              });
                             }}
                             title="点击定位到PDF对应页面"
                           >
