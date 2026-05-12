@@ -119,7 +119,7 @@ export default function ExtractionItemsPage() {
     return true;
   });
 
-  const itemTypes = [...new Set(items.map((i) => i.itemType).filter(Boolean))];
+  const itemTypes = [...new Set(items.map((i) => i.itemType).filter(Boolean))] as string[];
 
   const resetForm = useCallback(() => {
     setForm({ ...defaultForm, documentId: filterDocId || docs[0]?.id || "" });
