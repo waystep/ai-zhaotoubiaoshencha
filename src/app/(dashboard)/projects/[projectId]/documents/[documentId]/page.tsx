@@ -902,11 +902,6 @@ export default function DocumentDetailPage() {
                               {blockIndex != null ? (
                                 <span className="text-xs text-muted-foreground">#{blockIndex}</span>
                               ) : null}
-                              {(item as any).sourceBlockId && (
-                                <span className="ml-auto text-xs text-emerald-600" title="已关联原始区块">
-                                  已定位
-                                </span>
-                              )}
                               {confidence ? (
                                 <span className="ml-auto text-xs text-muted-foreground">置信度 {confidence}</span>
                               ) : null}
