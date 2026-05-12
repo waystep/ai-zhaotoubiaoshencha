@@ -403,14 +403,36 @@ export function PdfViewer({
     if (!pdfReady || numPages <= 0) return;
 
     const target = Math.min(Math.max(1, focusedIssue.pageNumber), numPages);
-    if (!pageEls.current.has(target)) return;
 
-    // 等待一帧，让 Tab 切换/布局稳定（避免第一次测量拿到 0 高度）
+    // 目标页未渲染：先导航到该页，等渲染后再定位
+    if (!pageEls.current.has(target)) {
+      scrollToPage(target);
+      // 轮询等待页面渲染（最多等 3 秒）
+      let attempts = 0;
+      const maxAttempts = 30;
+      const tryScroll = () => {
+        attempts++;
+        if (pageEls.current.has(target)) {
+          requestAnimationFrame(() => {
+            scrollToIssue({ ...focusedIssue, pageNumber: target });
+          });
+          const t = window.setTimeout(() => onFocusedIssueConsumed?.(), 800);
+          return () => window.clearTimeout(t);
+        }
+        if (attempts < maxAttempts) {
+          window.setTimeout(tryScroll, 100);
+        } else {
+          onFocusedIssueConsumed?.();
+        }
+      };
+      const tid = window.setTimeout(tryScroll, 100);
+      return () => window.clearTimeout(tid);
+    }
+
     const raf = requestAnimationFrame(() => {
       scrollToIssue({ ...focusedIssue, pageNumber: target });
     });
 
-    // 700ms 是 progScrollTargetRef 的保护窗口，这里稍微延后一点，确保“定位滚动”已触发
     const t = window.setTimeout(() => {
       onFocusedIssueConsumed?.();
     }, 800);
@@ -419,7 +441,7 @@ export function PdfViewer({
       cancelAnimationFrame(raf);
       window.clearTimeout(t);
     };
-  }, [focusedIssue, pdfReady, numPages, onFocusedIssueConsumed, scrollToIssue]);
+  }, [focusedIssue, pdfReady, numPages, onFocusedIssueConsumed, scrollToIssue, scrollToPage]);
 
   function isFocused(issue: IssueLocation): boolean {
     if (!focusedIssue) return false;
