@@ -344,7 +344,7 @@ export function PdfViewer({
       const desired =
         targetYInContainer - Math.max(24, container.clientHeight * 0.25);
 
-      // 标记 programmatic scroll，屏蔽 IO 期间的 onPageChange，防止父组件回写 currentPage 造成振荡
+      // 标记 programmatic scroll，屏蔽 IO 期间的 onPageChange
       progScrollTargetRef.current = issue.pageNumber;
       if (progScrollTimerRef.current) clearTimeout(progScrollTimerRef.current);
       progScrollTimerRef.current = setTimeout(() => {
@@ -352,12 +352,7 @@ export function PdfViewer({
         progScrollTimerRef.current = null;
       }, 700);
 
-      // 先确保页面在视口中
-      pageEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      // 再精确滚动到 bbox 位置
-      setTimeout(() => {
-        container.scrollTo({ top: Math.max(0, desired), behavior: "smooth" });
-      }, 100);
+      container.scrollTo({ top: Math.max(0, desired), behavior: "smooth" });
     },
     // scrollToPage 是稳定的；blocksByPage / highlightedIssues / overlaySize 等随状态变化
     // eslint-disable-next-line react-hooks/exhaustive-deps
