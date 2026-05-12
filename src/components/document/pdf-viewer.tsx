@@ -67,13 +67,17 @@ function mapBoxToOverlay(
   inset: number = 0
 ) {
   // MinerU bbox 使用左上角原点，与 CSS overlay 一致
-  // 垂直补偿：react-pdf text layer 的 font metrics 引入约 2% 偏移
   const yCorrection = inset ? 0 : Math.round(overlayH * 0.018);
-  const left = (box.x0 / refW) * overlayW - inset;
-  const top = (box.y0 / refH) * overlayH - yCorrection - inset;
-  const width = ((box.x1 - box.x0) / refW) * overlayW + inset * 2;
-  const height = ((box.y1 - box.y0) / refH) * overlayH + inset * 2;
-  return { left, top, width: Math.max(width, 1), height: Math.max(height, 1) };
+  let left = (box.x0 / refW) * overlayW - inset;
+  let top = (box.y0 / refH) * overlayH - yCorrection - inset;
+  let width = ((box.x1 - box.x0) / refW) * overlayW + inset * 2;
+  let height = ((box.y1 - box.y0) / refH) * overlayH + inset * 2;
+  // Clamp 到 overlay 范围内（bbox 坐标可能略微超出页面参考尺寸）
+  if (left < 0) { width += left; left = 0; }
+  if (top < 0) { height += top; top = 0; }
+  if (left + width > overlayW) width = overlayW - left;
+  if (top + height > overlayH) height = overlayH - top;
+  return { left, top, width: Math.max(width, 4), height: Math.max(height, 4) };
 }
 
 function boxForIssue(issue: IssueLocation, pageBlocks: DocumentBlock[]) {
