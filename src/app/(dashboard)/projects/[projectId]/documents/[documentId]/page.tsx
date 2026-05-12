@@ -665,12 +665,8 @@ export default function DocumentDetailPage() {
               <CardTitle className="text-base">文档导航</CardTitle>
             </CardHeader>
             <CardContent className="min-h-0">
-              <Tabs defaultValue="blocks" className="min-h-0">
-                <TabsList className={`grid w-full ${document.docType === "bid_doc" && shouldShowExtractedTab ? "grid-cols-3" : document.docType === "bid_doc" || shouldShowExtractedTab ? "grid-cols-2" : "grid-cols-1"}`}>
-                  <TabsTrigger value="blocks" className="gap-1">
-                    <Blocks className="h-4 w-4" />
-                    区块详情
-                  </TabsTrigger>
+              <Tabs defaultValue={document.docType === "bid_doc" ? "imageRisks" : "extracted"} className="min-h-0">
+                <TabsList className="grid w-full grid-cols-1">
                   {document.docType === "bid_doc" ? (
                     <TabsTrigger value="imageRisks" className="gap-1">
                       <AlertTriangle className="h-4 w-4" />
@@ -689,51 +685,6 @@ export default function DocumentDetailPage() {
                     </TabsTrigger>
                   ) : null}
                 </TabsList>
-
-                <TabsContent value="blocks" className="mt-4">
-                  <div className="mb-3 text-xs text-muted-foreground">
-                    共 {blockCount} 个区块，点击后定位到右侧源文件预览。
-                  </div>
-                  <Accordion
-                    type="multiple"
-                    defaultValue={defaultOpenPages}
-                    className="max-h-[calc(100vh-13rem)] overflow-y-auto pr-1"
-                  >
-                    {blocksByPage.map((page) => (
-                      <AccordionItem key={page.pageNumber} value={`page-${page.pageNumber}`} className="border-b">
-                        <AccordionTrigger className="py-3 hover:no-underline">
-                          <span className="flex items-center gap-2">
-                            <Badge variant="outline">P.{page.pageNumber}</Badge>
-                            <span>{page.blocks.length} 个区块</span>
-                          </span>
-                        </AccordionTrigger>
-                        <AccordionContent className="space-y-2 pb-3">
-                          {page.blocks.map((block) => (
-                            <button
-                              key={block.id}
-                              type="button"
-                              className="w-full rounded-md border bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
-                              onClick={() => {
-                                setFocusedBlock(block);
-                                setItemFocus(null);
-                                setCurrentPage(block.pageNumber);
-                              }}
-                            >
-                              <div className="mb-2 flex items-center gap-2">
-                                {getBlockTypeIcon(block.blockType)}
-                                <Badge variant="secondary">{block.blockType || "text"}</Badge>
-                                <span className="ml-auto text-xs text-muted-foreground">#{block.blockIndex}</span>
-                              </div>
-                              <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
-                                {block.content || "（无文本内容）"}
-                              </p>
-                            </button>
-                          ))}
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </TabsContent>
 
                 {document.docType === "bid_doc" ? (
                   <TabsContent value="imageRisks" className="mt-4">
@@ -986,38 +937,14 @@ export default function DocumentDetailPage() {
 
           <Card className="min-w-0 bg-muted/20 shadow-sm">
             <CardContent className="p-4">
-              <Tabs defaultValue="source" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="source">源文件预览</TabsTrigger>
-                  <TabsTrigger value="content">全文内容</TabsTrigger>
-                </TabsList>
-                <TabsContent value="source" className="mt-0">
-                  <PdfViewer
-                    documentId={documentId}
-                    blocks={parsedResult.blocks}
-                    focusedIssue={focusedIssue}
-                    currentPage={currentPage}
-                    onPageChange={setCurrentPage}
-                    onFocusedIssueConsumed={() => { setFocusedBlock(null); setItemFocus(null); }}
-                  />
-                </TabsContent>
-                <TabsContent value="content" className="mt-0">
-                  {markdown ? (
-                    <div className="max-h-[calc(100vh-10rem)] overflow-y-auto rounded-md border bg-background p-5">
-                      <Streamdown
-                        className="prose prose-sm max-w-none dark:prose-invert prose-img:max-w-full prose-img:rounded-md"
-                        plugins={{ cjk }}
-                      >
-                        {markdown}
-                      </Streamdown>
-                    </div>
-                  ) : (
-                    <div className="rounded-md border border-dashed bg-background p-6 text-sm text-muted-foreground">
-                      暂无全文内容。
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+              <PdfViewer
+                documentId={documentId}
+                blocks={parsedResult.blocks}
+                focusedIssue={focusedIssue}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                onFocusedIssueConsumed={() => { setFocusedBlock(null); setItemFocus(null); }}
+              />
             </CardContent>
           </Card>
         </div>
