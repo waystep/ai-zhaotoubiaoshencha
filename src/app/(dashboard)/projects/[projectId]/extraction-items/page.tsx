@@ -219,7 +219,7 @@ export default function ExtractionItemsPage() {
           />
         </div>
         <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm"
           value={filterDocId}
           onChange={(e) => setFilterDocId(e.target.value)}
         >
@@ -229,7 +229,7 @@ export default function ExtractionItemsPage() {
           ))}
         </select>
         <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
