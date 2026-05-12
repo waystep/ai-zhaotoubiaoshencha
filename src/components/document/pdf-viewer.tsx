@@ -72,7 +72,7 @@ function mapBoxToOverlay(
   const top = (box.y0 / refH) * overlayH - yCorrection - inset;
   const width = ((box.x1 - box.x0) / refW) * overlayW + inset * 2;
   const height = ((box.y1 - box.y0) / refH) * overlayH + inset * 2;
-  return { left, top, width: Math.max(width, 4), height: Math.max(height, 4) };
+  return { left, top, width: Math.max(width, 8), height: Math.max(height, 8) };
 }
 
 function boxForIssue(issue: IssueLocation, pageBlocks: DocumentBlock[]) {
