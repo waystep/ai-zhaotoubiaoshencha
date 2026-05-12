@@ -916,7 +916,7 @@ export default function DocumentDetailPage() {
                               ) : null}
                             </div>
                             <div className="text-sm font-medium leading-6">{item.title}</div>
-                            <p className="mt-1 line-clamp-4 text-sm leading-6 text-muted-foreground">
+                            <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                               {item.description}
                             </p>
                             {isReview && item.consequence ? (
