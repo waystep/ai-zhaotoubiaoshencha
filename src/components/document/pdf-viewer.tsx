@@ -68,15 +68,10 @@ function mapBoxToOverlay(
 ) {
   // MinerU bbox 使用左上角原点，与 CSS overlay 一致
   const yCorrection = inset ? 0 : Math.round(overlayH * 0.018);
-  let left = (box.x0 / refW) * overlayW - inset;
-  let top = (box.y0 / refH) * overlayH - yCorrection - inset;
-  let width = ((box.x1 - box.x0) / refW) * overlayW + inset * 2;
-  let height = ((box.y1 - box.y0) / refH) * overlayH + inset * 2;
-  // Clamp 到 overlay 范围内（bbox 坐标可能略微超出页面参考尺寸）
-  if (left < 0) { width += left; left = 0; }
-  if (top < 0) { height += top; top = 0; }
-  if (left + width > overlayW) width = overlayW - left;
-  if (top + height > overlayH) height = overlayH - top;
+  const left = (box.x0 / refW) * overlayW - inset;
+  const top = (box.y0 / refH) * overlayH - yCorrection - inset;
+  const width = ((box.x1 - box.x0) / refW) * overlayW + inset * 2;
+  const height = ((box.y1 - box.y0) / refH) * overlayH + inset * 2;
   return { left, top, width: Math.max(width, 4), height: Math.max(height, 4) };
 }
 
@@ -158,6 +153,8 @@ export function PdfViewer({
     setPageBaseDims(null);
     setActivePage(Math.max(1, currentPage ?? 1));
     pageEls.current.clear();
+    pageDims.current.clear();
+    pageRefDims.current.clear();
     lastIoPageRef.current = 0;
     lastWidthRef.current = 0;
     pageRatioRef.current.clear();
