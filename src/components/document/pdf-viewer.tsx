@@ -77,12 +77,13 @@ function mapBoxToOverlay(
   refW: number,
   refH: number,
   overlayW: number,
-  overlayH: number
+  overlayH: number,
+  inset: number = 0
 ) {
-  const left = (box.x0 / refW) * overlayW;
-  const top = (box.y0 / refH) * overlayH;
-  const width = ((box.x1 - box.x0) / refW) * overlayW;
-  const height = ((box.y1 - box.y0) / refH) * overlayH;
+  const left = (box.x0 / refW) * overlayW - inset;
+  const top = (box.y0 / refH) * overlayH - inset;
+  const width = ((box.x1 - box.x0) / refW) * overlayW + inset * 2;
+  const height = ((box.y1 - box.y0) / refH) * overlayH + inset * 2;
   return { left, top, width: Math.max(width, 1), height: Math.max(height, 1) };
 }
 
@@ -502,7 +503,8 @@ export function PdfViewer({
               refW,
               refH,
               overlaySize.w,
-              overlaySize.h
+              overlaySize.h,
+              2
             );
             const focused = isFocused(issue);
             const hovered = !focused && isHovered(issue);
@@ -542,7 +544,8 @@ export function PdfViewer({
               refW,
               refH,
               overlaySize.w,
-              overlaySize.h
+              overlaySize.h,
+              2
             );
             return (
               <div

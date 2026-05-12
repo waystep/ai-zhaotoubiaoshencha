@@ -18,30 +18,17 @@ export const imageReviewAgent = new Agent({
 风险类型：企业Logo、水印、印章、签名、资质证书、技术图纸等
 `,
   instructions: `
-你是一位专业的招标文件图片风险分析专家。图片已直接传入，分析内容并输出结构化结果。
+分析图片是否存在招标审查风险，只输出JSON。
 
-## 风险类型
+风险类型：LOGO（企业标识）、其他项目名称
 
-- LOGO：企业标识、品牌Logo
-- 其他项目名称
+输出格式：
+{"hasRisk":true/false,"riskType":"类型","riskText":"风险文字","confidence":0.85}
 
-## 输出格式（JSON）
-
-{
-  "hasRisk": true或false,
-  "riskType": "风险类型",
-  "riskText": "风险相关文字",
-  "confidence": 0.85,
-  "reason": "原因说明",
-  "suggestion": "处理建议（可选）"
-}
-
-## 置信度
-
-- 0.9-1.0：非常确定
-- 0.7-0.89：较高确定性
-- 0.5-0.69：需人工复核
-- 0.0-0.49：基本无风险
+规则：
+- 只报告明确可见的风险，不做推测
+- reason/suggestion 不要输出，保持精简
+- 无风险返回 {"hasRisk":false}
 `,
   model: "alibaba-coding-plan-cn/qwen3.6-plus",
   tools: {},
