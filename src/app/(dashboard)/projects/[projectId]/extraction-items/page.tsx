@@ -219,7 +219,7 @@ export default function ExtractionItemsPage() {
           />
         </div>
         <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           value={filterDocId}
           onChange={(e) => setFilterDocId(e.target.value)}
         >
@@ -229,7 +229,7 @@ export default function ExtractionItemsPage() {
           ))}
         </select>
         <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
@@ -313,7 +313,7 @@ export default function ExtractionItemsPage() {
             <div>
               <label className="text-xs text-muted-foreground">关联文档 *</label>
               <select
-                className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.documentId}
                 onChange={(e) => setForm({ ...form, documentId: e.target.value })}
               >
@@ -324,7 +324,7 @@ export default function ExtractionItemsPage() {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">类别</label>
-                <select className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                <select className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                   value={form.itemCategory} onChange={(e) => setForm({ ...form, itemCategory: e.target.value as any })}>
                   <option value="review">审查项</option>
                   <option value="response">应答项</option>
@@ -332,7 +332,7 @@ export default function ExtractionItemsPage() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">标段</label>
-                <select className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                <select className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                   value={form.bidSection} onChange={(e) => setForm({ ...form, bidSection: e.target.value })}>
                   <option value="">不限</option>
                   <option value="技术标">技术标</option>

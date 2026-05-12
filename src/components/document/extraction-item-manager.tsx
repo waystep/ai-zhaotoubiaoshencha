@@ -220,7 +220,7 @@ export function ExtractionItemManager({ documentId, projectId, items, onRefresh 
               <div>
                 <label className="text-xs text-muted-foreground">类别</label>
                 <select
-                  className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm w-full"
                   value={form.itemCategory}
                   onChange={(e) => setForm({ ...form, itemCategory: e.target.value as any })}
                 >
@@ -231,7 +231,7 @@ export function ExtractionItemManager({ documentId, projectId, items, onRefresh 
               <div>
                 <label className="text-xs text-muted-foreground">标段</label>
                 <select
-                  className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm w-full"
                   value={form.bidSection}
                   onChange={(e) => setForm({ ...form, bidSection: e.target.value })}
                 >
