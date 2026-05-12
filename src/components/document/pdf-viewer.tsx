@@ -518,38 +518,38 @@ export function PdfViewer({
             );
           })}
 
-          {/* Popover：点击提取项后的详情弹窗 */}
-          {activePopover && focusedIssue && focusedIssue.pageNumber === pageNum && (() => {
-            const popBox = boxForIssue(focusedIssue, pageBlocks);
-            if (!popBox) return null;
-            const pop = mapBoxToOverlay(popBox, refW, refH, rW, rH);
-            // 弹窗放在高亮框右侧或下方
-            const pTop = pop.top + pop.height + 6;
-            const pLeft = Math.min(pop.left, rW - 280);
-            return (
-              <div
-                className="pointer-events-auto absolute z-30 w-72 rounded-lg border border-orange-300 bg-white shadow-lg p-3 text-sm"
-                style={{ left: pLeft, top: pTop }}
-              >
-                <button
-                  className="absolute right-1 top-1 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => { e.stopPropagation(); onDismissPopover?.(); }}
-                >x</button>
-                <div className="font-semibold text-foreground mb-1">{activePopover.title}</div>
-                <p className="text-xs text-muted-foreground leading-5">{activePopover.desc}</p>
-                {activePopover.consequence && (
-                  <p className="mt-1 text-xs text-red-600">后果：{activePopover.consequence}</p>
-                )}
-                {activePopover.legalRef && (
-                  <p className="mt-1 text-xs text-muted-foreground">依据：{activePopover.legalRef}</p>
-                )}
-                <div className="mt-2 text-xs text-muted-foreground border-t pt-1">
-                  第{activePopover.page}页 #{activePopover.blockIdx}
-                </div>
-              </div>
-            );
-          })()}
         </div>
+
+        {/* Popover：点击提取项后的详情弹窗 — 放在 visual 层外，避免 pointer-events-none 拦截 */}
+        {activePopover && focusedIssue && focusedIssue.pageNumber === pageNum && (() => {
+          const popBox = boxForIssue(focusedIssue, pageBlocks);
+          if (!popBox) return null;
+          const pop = mapBoxToOverlay(popBox, refW, refH, rW, rH);
+          const pTop = pop.top + pop.height + 6;
+          const pLeft = Math.min(pop.left, rW - 280);
+          return (
+            <div
+              className="pointer-events-auto absolute z-30 w-72 rounded-lg border border-orange-300 bg-white shadow-lg p-3 text-sm"
+              style={{ left: pLeft, top: pTop }}
+            >
+              <button
+                className="absolute right-1 top-1 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => { e.stopPropagation(); onDismissPopover?.(); }}
+              >x</button>
+              <div className="font-semibold text-foreground mb-1">{activePopover.title}</div>
+              <p className="text-xs text-muted-foreground leading-5">{activePopover.desc}</p>
+              {activePopover.consequence && (
+                <p className="mt-1 text-xs text-red-600">后果：{activePopover.consequence}</p>
+              )}
+              {activePopover.legalRef && (
+                <p className="mt-1 text-xs text-muted-foreground">依据：{activePopover.legalRef}</p>
+              )}
+              <div className="mt-2 text-xs text-muted-foreground border-t pt-1">
+                第{activePopover.page}页 #{activePopover.blockIdx}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 命中层：只负责 hover 联动，不影响视觉（透明） */}
         <div
