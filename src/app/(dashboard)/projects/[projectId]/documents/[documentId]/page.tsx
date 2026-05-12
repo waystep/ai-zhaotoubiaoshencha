@@ -896,23 +896,23 @@ export default function DocumentDetailPage() {
                                 : "无定位信息"
                             }
                           >
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <Badge variant={isReview ? "destructive" : "secondary"}>
+                            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                              <Badge variant={isReview ? "destructive" : "secondary"} className="text-xs">
                                 {isReview ? "审查项" : "应答项"}
                               </Badge>
-                              <Badge variant="secondary">{item.itemType}</Badge>
+                              <Badge variant="secondary" className="text-xs">{item.itemType}</Badge>
                               {(item as any).bidSection && (
-                                <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs">
                                   {(item as any).bidSection}
                                 </Badge>
                               )}
-                              {item.itemNo && <Badge variant="outline">{item.itemNo}</Badge>}
-                              {pageNumber ? <Badge variant="outline">第{pageNumber}页</Badge> : null}
-                              {blockIndex != null ? (
-                                <span className="text-xs text-muted-foreground">#{blockIndex}</span>
-                              ) : null}
+                              {item.itemNo && <Badge variant="outline" className="text-xs">{item.itemNo}</Badge>}
+                            </div>
+                            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                              {pageNumber ? <span>第{pageNumber}页</span> : null}
+                              {blockIndex != null ? <span>#{blockIndex}</span> : null}
                               {confidence ? (
-                                <span className="ml-auto text-xs text-muted-foreground">置信度 {confidence}</span>
+                                <span className="ml-auto">置信度 {confidence}</span>
                               ) : null}
                             </div>
                             <div className="text-sm font-medium leading-6">{item.title}</div>
