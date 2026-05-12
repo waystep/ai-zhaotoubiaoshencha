@@ -773,10 +773,29 @@ export default function DocumentDetailPage() {
                         const pageNumber = item.location?.pageNumber ?? item.sourceBlock?.pageNumber;
                         const blockIndex = item.location?.blockIndex ?? item.sourceBlock?.blockIndex;
                         const confidence = confidenceLabel(item.extractionConfidence);
-                        const locPage = item.location?.pageNumber ?? item.sourceBlock?.pageNumber ?? 0;
-                        const locIdx = item.location?.blockIndex ?? item.sourceBlock?.blockIndex ?? 0;
-                        const locBbox = item.location?.bbox ?? item.sourceBlock?.bbox;
+                        // 通过 sourceBlockId 从已加载的 blocks 中查找真实 block 信息
+                        const resolvedBlock =
+                          (item as any).sourceBlockId && parsedResult?.blocks
+                            ? parsedResult.blocks.find(
+                                (b: any) => b.id === (item as any).sourceBlockId
+                              )
+                            : null;
+                        const locPage =
+                          resolvedBlock?.pageNumber ??
+                          item.location?.pageNumber ??
+                          item.sourceBlock?.pageNumber ??
+                          0;
+                        const locIdx =
+                          resolvedBlock?.blockIndex ??
+                          item.location?.blockIndex ??
+                          item.sourceBlock?.blockIndex ??
+                          0;
+                        const locBbox =
+                          resolvedBlock?.bbox ??
+                          item.location?.bbox ??
+                          item.sourceBlock?.bbox;
                         const canLocate = locPage > 0;
+                        const hasExactBlock = !!resolvedBlock;
 
                         return (
                           <button
@@ -796,7 +815,13 @@ export default function DocumentDetailPage() {
                                 textSnippet: item.title,
                               });
                             }}
-                            title={canLocate ? "点击定位到原文" : "无定位信息"}
+                            title={
+                              hasExactBlock
+                                ? "点击定位到原文（已关联区块）"
+                                : canLocate
+                                ? "点击定位到对应页面"
+                                : "无定位信息"
+                            }
                           >
                             <div className="mb-2 flex flex-wrap items-center gap-2">
                               <Badge variant={isReview ? "destructive" : "secondary"}>
