@@ -18,7 +18,7 @@ export const extractionItemStorageTool = createTool({
           itemCategory: z
             .enum(["review", "response"])
             .describe("类别：review=审查项, response=应答项"),
-          sourceBlockId: z.string().uuid().optional().describe("来源区块ID"),
+          sourceBlockId: z.string().optional().describe("来源区块ID（可选，传null或跳过）"),
           itemType: z.string().describe("类型（如：工期要求、资质要求、完整性要求、编制标准等）"),
           itemNo: z.string().optional().describe("条款编号"),
           title: z.string().describe("标题"),
