@@ -4,7 +4,7 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "智能招标审查平台",
+  title: "智能招投标预审平台",
   description: "AI驱动的招标文件智能审查与分析平台，支持文档解析、合规性审查、智能评分与报告生成",
 };
 

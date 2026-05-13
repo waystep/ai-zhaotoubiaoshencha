@@ -30,7 +30,9 @@ export const imageReviewAgent = new Agent({
 - reason/suggestion 不要输出，保持精简
 - 无风险返回 {"hasRisk":false}
 `,
-  model: "alibaba-coding-plan-cn/qwen3.6-plus",
+  model: process.env.ALIBABA_CODING_PLAN_API_KEY
+    ? "alibaba-coding-plan-cn/qwen3.6-plus"
+    : "alibaba/qwen3.6-plus",
   tools: {},
 });
 
