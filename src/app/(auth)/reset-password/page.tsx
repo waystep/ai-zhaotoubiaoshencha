@@ -106,7 +106,7 @@ function ResetPasswordForm() {
       <CardHeader className="space-y-1">
         <div className="flex items-center gap-2 mb-2">
           <ClipboardCheck className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold">智能招标审查平台</span>
+          <span className="text-xl font-bold">智能招投标预审平台</span>
         </div>
         <CardTitle className="text-2xl text-center">设置新密码</CardTitle>
         <CardDescription className="text-center">请输入至少 8 位新密码</CardDescription>

@@ -50,11 +50,11 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-4">
             <ClipboardCheck className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">智能招标审查平台</span>
+            <span className="text-xl font-bold">智能招投标预审平台</span>
           </div>
           <CardTitle className="text-2xl text-center">创建账号</CardTitle>
           <CardDescription className="text-center">
-            输入您的信息开始使用智能招标审查平台
+            输入您的信息开始使用智能招投标预审平台
           </CardDescription>
         </CardHeader>
         <form onSubmit={onSubmit}>
