@@ -1,9 +1,13 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { CopyIcon, RefreshCcwIcon } from "lucide-react";
+import { ArrowLeft, CopyIcon, RefreshCcwIcon } from "lucide-react";
+
+import { labelForReturnPath, sanitizeInternalReturnPath } from "@/lib/nav/from-chat-return";
 
 import {
   Conversation,
@@ -41,7 +45,12 @@ const suggestions = [
   "重新提取招标文件审查项",
 ];
 
-const ChatDemo = () => {
+function ChatAssistantContent() {
+  const searchParams = useSearchParams();
+  const fromPath = sanitizeInternalReturnPath(searchParams.get("from"));
+  const returnHref = fromPath ?? "/projects";
+  const returnLabel = fromPath ? labelForReturnPath(fromPath) : "项目列表";
+
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, regenerate } = useChat({
     transport: new DefaultChatTransport({
@@ -62,8 +71,24 @@ const ChatDemo = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-0 md:p-6 relative size-full">
-      <div className="flex flex-col h-full min-h-[600px]">
+    <div className="relative mx-auto size-full max-w-4xl p-0 md:p-6">
+      <Link
+        href={returnHref}
+        title={fromPath ? `返回进入 AI 助手前的页面：${fromPath}` : "返回项目列表"}
+        className="mb-4 inline-flex max-w-full items-center gap-1.5 text-sm text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 truncate">
+          {fromPath ? (
+            <>
+              返回<span className="text-foreground/90">（{returnLabel}）</span>
+            </>
+          ) : (
+            "返回项目列表"
+          )}
+        </span>
+      </Link>
+      <div className="flex min-h-[600px] h-full flex-col">
         <Conversation className="h-full">
           <ConversationContent>
             {messages.length === 0 && (
@@ -233,6 +258,18 @@ const ChatDemo = () => {
       </div>
     </div>
   );
-};
+}
 
-export default ChatDemo;
+export default function ChatAssistantPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative mx-auto flex min-h-[400px] max-w-4xl items-center justify-center p-6 text-sm text-muted-foreground">
+          加载中…
+        </div>
+      }
+    >
+      <ChatAssistantContent />
+    </Suspense>
+  );
+}

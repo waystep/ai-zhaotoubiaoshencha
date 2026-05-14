@@ -40,8 +40,9 @@ type ProjectApiItem = ProjectOption & {
 };
 
 function navItemIsActive(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  return href !== "/" && pathname.startsWith(`${href}/`);
+  const baseHref = href.split("?")[0] || href;
+  if (pathname === baseHref) return true;
+  return baseHref !== "/" && pathname.startsWith(`${baseHref}/`);
 }
 
 function selectedProjectIdFromPath(pathname: string): string | null {
@@ -130,13 +131,21 @@ export default function DashboardLayout({
       ]
     : [];
 
-  const globalNavigation = [
-    {
-      name: "AI 助手",
-      href: "/chat",
-      icon: Bot,
-    },
-  ];
+  const chatNavHref = useMemo(() => {
+    if (!pathname || pathname === "/chat") return "/chat";
+    return `/chat?from=${encodeURIComponent(pathname)}`;
+  }, [pathname]);
+
+  const globalNavigation = useMemo(
+    () => [
+      {
+        name: "AI 助手",
+        href: chatNavHref,
+        icon: Bot,
+      },
+    ],
+    [chatNavHref]
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
