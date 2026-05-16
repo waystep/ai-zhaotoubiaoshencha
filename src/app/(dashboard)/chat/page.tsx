@@ -94,7 +94,7 @@ function ChatAssistantContent() {
             {messages.length === 0 && (
               <div className="flex size-full flex-col items-center justify-center gap-3 p-8 text-center">
                 <div className="space-y-1">
-                  <h3 className="font-medium text-lg">智能招投标预审</h3>
+                  <h3 className="font-medium text-lg">智能投标预审智能体</h3>
                   <p className="text-muted-foreground text-sm">
                     发送消息或点击下方建议开始对话
                   </p>

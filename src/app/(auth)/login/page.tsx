@@ -39,7 +39,7 @@ function BrandSection() {
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
             <ClipboardCheck className="w-6 h-6 text-white" />
           </div>
-          <span className="text-[28px] font-bold text-white">智能招投标预审平台</span>
+          <span className="text-[28px] font-bold text-white">智能投标预审智能体</span>
         </div>
 
         <h1 className="text-[48px] font-bold text-white leading-tight">
@@ -202,7 +202,7 @@ function LoginForm() {
           <div className="hidden sm:flex items-center justify-between mb-8">
             <div className="flex items-center gap-2">
               <ClipboardCheck className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-foreground">智能招投标预审平台</span>
+              <span className="text-xl font-bold text-foreground">智能投标预审智能体</span>
             </div>
             <Link
               href="/register"
@@ -217,7 +217,7 @@ function LoginForm() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ClipboardCheck className="h-7 w-7 text-primary" />
-                  <span className="text-lg font-bold text-foreground">智能招投标预审平台</span>
+                  <span className="text-lg font-bold text-foreground">智能投标预审智能体</span>
                 </div>
                 <Link href="/register" className="text-sm font-medium text-primary">
                   注册
@@ -419,7 +419,7 @@ function LoginLoading() {
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-4">
             <ClipboardCheck className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">智能招投标预审平台</span>
+            <span className="text-xl font-bold">智能投标预审智能体</span>
           </div>
           <CardTitle className="text-2xl font-semibold">欢迎回来</CardTitle>
           <CardDescription>请输入您的账号信息登录</CardDescription>

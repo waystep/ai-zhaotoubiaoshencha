@@ -36,7 +36,7 @@ export default async function DashboardPage() {
           欢迎回来，{session.user?.name}
         </h2>
         <p className="text-muted-foreground">
-          智能招投标预审平台 - AI驱动的文档审查与分析
+          智能投标预审智能体 - AI驱动的文档审查与分析
         </p>
       </div>
 

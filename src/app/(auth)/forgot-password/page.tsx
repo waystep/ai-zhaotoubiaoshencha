@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
         <CardHeader className="space-y-1">
           <div className="flex items-center gap-2 mb-2">
             <ClipboardCheck className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">智能招投标预审平台</span>
+            <span className="text-xl font-bold">智能投标预审智能体</span>
           </div>
           <CardTitle className="text-2xl text-center">忘记密码</CardTitle>
           <CardDescription className="text-center">

@@ -21,7 +21,7 @@ export async function sendPasswordResetEmail(
       body: JSON.stringify({
         from,
         to: [to],
-        subject: "智能招投标预审平台 — 重置密码",
+        subject: "智能投标预审智能体 — 重置密码",
         html: `
           <p>您好，</p>
           <p>请点击以下链接在 1 小时内重置登录密码（如非本人操作请忽略）：</p>
