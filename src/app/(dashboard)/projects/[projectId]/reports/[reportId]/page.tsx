@@ -26,7 +26,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Streamdown } from "streamdown";
 import { PdfViewer } from "@/components/document/pdf-viewer";
-import { IssueLocationViewer } from "@/components/review/issue-location-viewer";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -523,13 +522,17 @@ export default function ReportDetailPage() {
 
   const handleLocateReviewItem = useCallback(
     (result: ReviewItemResult) => {
-      locateResult({
-        evidenceBlockIds: result.evidenceBlockIds,
-        itemId: result.reviewItem.id,
-        itemTitle: result.reviewItem.title,
-      });
+      if (result.reviewItem.blocks && result.reviewItem.blocks.length > 0) {
+        const fb = result.reviewItem.blocks[0];
+        setCurrentPage(fb.pageNumber);
+        setFocusedIssueOnce({ pageNumber: fb.pageNumber, blockIndex: fb.blockIndex });
+        const md = report?.standardDocuments?.find((d) => d.docType === "tender_doc");
+        if (md) { setSelectedStandardDocId(md.id); setStandardPage(fb.pageNumber); }
+        return;
+      }
+      locateResult({ evidenceBlockIds: result.evidenceBlockIds, itemId: result.reviewItem.id, itemTitle: result.reviewItem.title });
     },
-    [locateResult]
+    [locateResult, report?.standardDocuments]
   );
 
   const handleLocateResponseItem = useCallback(
@@ -674,123 +677,92 @@ export default function ReportDetailPage() {
         </Card>
       )}
 
-      {report.status === "completed" && report.reviewItemResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <CardTitle className="text-base">审查项结果</CardTitle>
-                <CardDescription>核验投标文件是否满足强制性或合规性要求</CardDescription>
-              </div>
-              {report.structuredSummary && (
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-muted-foreground">共 <span className="font-medium text-foreground">{report.structuredSummary.reviewItemsSummary.total}</span> 项</span>
-                  <span className="text-green-600">通过 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.pass}</span></span>
-                  <span className="text-red-600">不满足 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.fail}</span></span>
-                  <span className="text-yellow-600">待复核 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.needsManualReview}</span></span>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {report.reviewItemResults.map((result) => (
-                <button key={result.id} type="button" onClick={() => handleLocateReviewItem(result)}
-                  className="w-full rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/30">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Badge className={reviewStatusClasses[result.status]}>{reviewStatusLabels[result.status]}</Badge>
-                        {result.reviewItem.section && (
-                          <Badge variant="outline" className="border-blue-300 text-blue-700">{result.reviewItem.section}</Badge>
-                        )}
-                        <span className="text-sm font-medium">{result.reviewItem.title}</span>
-                      </div>
-                      {result.reviewItem.checkpoint && (
-                        <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{result.reviewItem.checkpoint}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span>{result.evidenceBlockIds?.length ?? 0} 个证据块</span>
-                      <ChevronRight className="h-4 w-4" />
-                    </div>
-                  </div>
-                  <div className="mt-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">{result.reason}</div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {report.status === "completed" && (
         <>
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
             <div className="space-y-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>问题定位</CardTitle>
-                  <CardDescription>图片暗标风险及审查发现的问题</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="issues" className="w-full">
-                    <TabsList className={`grid w-full ${report.imageRisks && report.imageRisks.filter((i) => i.hasRisk).length > 0 ? "grid-cols-2" : "grid-cols-1"}`}>
-                      <TabsTrigger value="issues">问题</TabsTrigger>
-                      {report.imageRisks && report.imageRisks.filter((i) => i.hasRisk).length > 0 && (
-                        <TabsTrigger value="image-risks">
-                          图片风险
-                          <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-xs">{report.imageRisks.filter((i) => i.hasRisk).length}</Badge>
-                        </TabsTrigger>
-                      )}
-                    </TabsList>
-                    <TabsContent value="issues" className="mt-3">
-                      <IssueLocationViewer
-                        issues={report.issues}
-                        currentPage={currentPage}
-                        onIssueClick={selectIssue}
-                        onIssueHover={(issue) => {
-                          setHoveredIssue(issue?.location ?? null);
-                          setHoveredIssueId(issue?.id ?? null);
-                        }}
-                        hoveredIssueId={hoveredIssueId ?? undefined}
-                        issueNoById={issueNoById}
-                      />
-                    </TabsContent>
-                    {report.imageRisks && report.imageRisks.filter((i) => i.hasRisk).length > 0 && (
-                      <TabsContent value="image-risks" className="mt-3">
-                        <div className="max-h-80 space-y-2 overflow-y-auto">
-                          {report.imageRisks.filter((i) => i.hasRisk).map((img) => {
-                            const resolvedBlock = bidBlocks.find(
-                              (b) => b.imagePath && (b.imagePath === img.imagePath || b.imagePath.endsWith(img.imagePath))
-                            );
-                            const loc = resolvedBlock
-                              ? buildLocationFromBlock(resolvedBlock)
-                              : { pageNumber: img.pageNumber, blockIndex: 0 };
-                            return (
-                            <button key={img.id} type="button" onClick={() => selectLocation(loc)}
-                              className="w-full text-left flex items-start gap-3 rounded-md border border-red-100 bg-red-50 p-3 text-sm hover:border-red-300 hover:bg-red-100 transition-colors">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">第{img.pageNumber}页</Badge>
-                                  <Badge variant="destructive" className="text-xs">{img.riskType}</Badge>
-                                </div>
-                                {img.riskText && <p className="mt-1 text-xs font-medium">{img.riskText}</p>}
-                                {img.confidence && (
-                                  <p className="mt-0.5 text-xs text-muted-foreground">
-                                    置信度: {Number(img.confidence) <= 1 ? `${Math.round(Number(img.confidence) * 100)}%` : `${Math.round(Number(img.confidence))}%`}
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                            );
-                          })}
-                        </div>
-                      </TabsContent>
+              {/* 审查项结果 */}
+              {report.reviewItemResults.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle>审查项结果</CardTitle>
+                    <CardDescription>点击可定位到对应文档位置</CardDescription>
+                    {report.structuredSummary && (
+                      <div className="flex items-center gap-3 text-xs mt-1">
+                        <span className="text-muted-foreground">共 <span className="font-medium text-foreground">{report.structuredSummary.reviewItemsSummary.total}</span> 项</span>
+                        <span className="text-green-600">通过 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.pass}</span></span>
+                        <span className="text-red-600">不满足 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.fail}</span></span>
+                        <span className="text-yellow-600">待复核 <span className="font-medium">{report.structuredSummary.reviewItemsSummary.needsManualReview}</span></span>
+                      </div>
                     )}
-                  </Tabs>
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="max-h-[calc(100vh-360px)] overflow-y-auto space-y-2">
+                      {report.reviewItemResults.map((result) => (
+                        <button key={result.id} type="button" onClick={() => handleLocateReviewItem(result)}
+                          className="w-full rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted/30">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge className={reviewStatusClasses[result.status]}>{reviewStatusLabels[result.status]}</Badge>
+                                {result.reviewItem.section && (
+                                  <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs">{result.reviewItem.section}</Badge>
+                                )}
+                                <span className="text-sm font-medium">{result.reviewItem.title}</span>
+                              </div>
+                              {result.reviewItem.checkpoint && (
+                                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{result.reviewItem.checkpoint}</p>
+                              )}
+                              <div className="mt-1.5 rounded bg-muted/40 p-2 text-xs text-muted-foreground">{result.reason}</div>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 mt-1">
+                              <MapPin className="h-3 w-3" />
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {/* 图片风险 */}
+              {report.imageRisks && report.imageRisks.filter((i) => i.hasRisk).length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle>图片风险</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="max-h-80 space-y-2 overflow-y-auto">
+                      {report.imageRisks.filter((i) => i.hasRisk).map((img) => {
+                        const resolvedBlock = bidBlocks.find(
+                          (b) => b.imagePath && (b.imagePath === img.imagePath || b.imagePath.endsWith(img.imagePath))
+                        );
+                        const loc = resolvedBlock
+                          ? buildLocationFromBlock(resolvedBlock)
+                          : { pageNumber: img.pageNumber, blockIndex: 0 };
+                        return (
+                        <button key={img.id} type="button" onClick={() => selectLocation(loc)}
+                          className="w-full text-left flex items-start gap-3 rounded-md border border-red-100 bg-red-50 p-3 text-sm hover:border-red-300 hover:bg-red-100 transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">第{img.pageNumber}页</Badge>
+                              <Badge variant="destructive" className="text-xs">{img.riskType}</Badge>
+                            </div>
+                            {img.riskText && <p className="mt-1 text-xs font-medium">{img.riskText}</p>}
+                            {img.confidence && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                置信度: {Number(img.confidence) <= 1 ? `${Math.round(Number(img.confidence) * 100)}%` : `${Math.round(Number(img.confidence))}%`}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             <div className="space-y-6">

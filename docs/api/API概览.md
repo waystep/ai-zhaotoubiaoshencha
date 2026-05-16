@@ -135,7 +135,7 @@ if (!membership) {
 {
   "id": "uuid",
   "name": "名称",
-  "createdAt": "2024-01-01T00:00:00Z"
+  "createdAt": "2026-05-16T00:00:00Z"
 }
 ```
 

@@ -6,7 +6,8 @@ import { documentReaderTool } from "../tools/document-reader-tool";
 import { getReviewItemsTool } from "../tools/get-review-items-tool";
 import { getReportTool } from "../tools/get-report-tool";
 import { resolveReviewReportTool } from "../tools/resolve-review-report-tool";
-import { structuredReviewStorageTool } from "../tools/structured-review-storage-tool";
+import { reviewResultsStorageTool } from "../tools/review-results-storage-tool";
+import { issueStorageTool } from "../tools/issue-storage-tool";
 import { reviewModelConfig, tenderReviewInstructions } from "../config/review";
 import { pgStore, pgVector } from "../storage";
 
@@ -19,10 +20,17 @@ export const tenderReviewAgent = new Agent({
     storage: pgStore,
     vector: pgVector,
     options: {
-      lastMessages: 20,
+      lastMessages: 10,
       workingMemory: {
         enabled: true,
         scope: "resource",
+      },
+      observationalMemory: {
+        enabled: true,
+        model: reviewModelConfig.defaultModel,
+        messageTokens: 60000,
+        observationTokens: 90000,
+        blockAfter: 100000,
       },
       generateTitle: true,
     },
@@ -32,6 +40,7 @@ export const tenderReviewAgent = new Agent({
     getReportTool,
     getReviewItemsTool,
     documentReaderTool,
-    structuredReviewStorageTool,
+    reviewResultsStorageTool,
+    issueStorageTool,
   },
 });

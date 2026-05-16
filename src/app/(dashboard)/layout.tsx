@@ -180,9 +180,9 @@ export default function DashboardLayout({
     : [];
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-screen flex-col bg-background">
       {/* 统一的顶部 Header - 全宽 */}
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur shrink-0">
         <div className="flex items-center gap-4 px-6 h-14">
           {/* Logo */}
           <Link href="/projects" className="flex items-center gap-2.5 rounded-lg shrink-0">
@@ -292,10 +292,10 @@ export default function DashboardLayout({
         )}
 
         {/* 主内容区域 */}
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-w-0 flex-1 flex-col relative">
           <div
             id="dashboard-scroll"
-            className="min-h-0 flex-1 overflow-auto p-4 [scrollbar-gutter:stable]"
+            className="absolute inset-0 overflow-auto [scrollbar-gutter:stable]"
           >
             {children}
           </div>

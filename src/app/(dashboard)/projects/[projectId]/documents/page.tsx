@@ -346,7 +346,7 @@ export default function ProjectDocumentsPage() {
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       {/* 紧凑的工具栏 */}
       <div className="sticky top-0 z-10 -mx-6 border-b bg-background/95 backdrop-blur px-6 py-3">
         <div className="flex items-center gap-3">

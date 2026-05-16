@@ -6,6 +6,9 @@
 @tailwind utilities;
 
 @layer base {
+  html, body {
+    @apply h-full;
+  }
   * {
     @apply border-border;
   }

@@ -42,8 +42,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
-      <body className="min-h-screen bg-background antialiased">
+    <html lang="zh-CN" suppressHydrationWarning className="h-full">
+      <body className="h-full bg-background antialiased">
         <AuthProvider>
           {children}
           <Toaster />

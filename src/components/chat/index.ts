@@ -24,6 +24,12 @@ export type { SuggestionsProps, SuggestionProps } from "./suggestions";
 export { ToolCall, ToolCalls } from "./tool-call";
 export type { ToolCallProps, ToolCallsProps } from "./tool-call";
 
+export { SubAgentResult } from "./sub-agent-result";
+export type { SubAgentResultProps } from "./sub-agent-result";
+
+export { AgentSeparator, AgentSourceBadge, formatAgentName, getAgentAvatarStyle, getSupervisorAvatarStyle } from "./agent-separator";
+export type { AgentSeparatorProps, AgentSourceBadgeProps } from "./agent-separator";
+
 export {
   PromptInput,
   PromptInputProvider,

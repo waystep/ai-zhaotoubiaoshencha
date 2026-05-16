@@ -137,7 +137,7 @@ export default function NewProjectPage() {
               <Input
                 id="name"
                 name="name"
-                placeholder="如：2024年度办公设备采购项目"
+                placeholder="如：2026年度办公设备采购项目"
                 required
                 disabled={isLoading}
                 aria-invalid={Boolean(fieldErrors.name)}
@@ -156,7 +156,7 @@ export default function NewProjectPage() {
               <Input
                 id="projectNo"
                 name="projectNo"
-                placeholder="如：TEND-2024-001（自动生成）"
+                placeholder="如：TEND-2026-001（自动生成）"
                 disabled={isLoading}
                 aria-invalid={Boolean(fieldErrors.projectNo)}
                 className={cn(fieldErrors.projectNo && "border-destructive focus-visible:ring-destructive")}

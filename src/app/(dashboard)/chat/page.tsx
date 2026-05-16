@@ -36,8 +36,12 @@ import {
   Reasoning,
   ReasoningTrigger,
   ReasoningContent,
+  ToolCall,
+  ToolCalls,
+  AgentSeparator,
+  AgentSourceBadge,
+  formatAgentName,
 } from "@/components/chat";
-import { ToolCall, ToolCalls } from "@/components/chat/tool-call";
 
 const suggestions = [
   "帮我启动项目审查",
@@ -115,7 +119,7 @@ function ChatAssistantContent() {
                 status === "streaming" &&
                 message.parts.at(-1)?.type === "reasoning";
 
-              // 收集当轮的 tool 调用
+              // 收集工具调用（包括子智能体调用）
               const toolMap = new Map<string, {
                 toolCallId: string;
                 toolName: string;
@@ -123,24 +127,110 @@ function ChatAssistantContent() {
                 input?: unknown;
                 output?: unknown;
                 errorText?: string;
+                agentSource?: string;
               }>();
+
+              // 子智能体的内部工具调用（需要平级展开）
+              const subAgentTools: Array<{
+                agentId: string;
+                toolCallId: string;
+                toolName: string;
+                state: "running" | "complete" | "error";
+                input?: unknown;
+                output?: unknown;
+              }> = [];
+
+              // 子智能体的文本输出（需要平级展开）
+              const subAgentTexts: Array<{
+                agentId: string;
+                text: string;
+              }> = [];
+
+              // 当前正在处理的子智能体ID
+              let currentSubAgentId: string | null = null;
+
               for (const part of message.parts) {
-                if (part.type === "tool-input-available" || part.type === "tool-input-start") {
+                const partType = String(part.type);
+
+                // 处理 data-tool-agent 或 tool-agent（子智能体完成事件）
+                if (partType === "tool-agent" || partType === "data-tool-agent") {
+                  const p = part as unknown as {
+                    toolCallId?: string;
+                    payload?: {
+                      text?: string;
+                      toolCalls?: Array<{
+                        toolName: string;
+                        args?: unknown;
+                        result?: unknown;
+                      }>;
+                    };
+                    data?: {
+                      text?: string;
+                      toolCalls?: Array<{
+                        toolName: string;
+                        args?: unknown;
+                        result?: unknown;
+                      }>;
+                    };
+                  };
+
+                  const agentId = p.toolCallId?.replace(/^agent-/, "") || "sub-agent";
+                  const agentData = p.payload || p.data;
+
+                  // 提取子智能体的文本输出
+                  if (agentData?.text) {
+                    subAgentTexts.push({
+                      agentId,
+                      text: agentData.text,
+                    });
+                  }
+
+                  // 提取子智能体的工具调用
+                  if (agentData?.toolCalls && Array.isArray(agentData.toolCalls)) {
+                    for (const tc of agentData.toolCalls) {
+                      subAgentTools.push({
+                        agentId,
+                        toolCallId: `${agentId}-${tc.toolName}-${Date.now()}`,
+                        toolName: tc.toolName,
+                        state: "complete",
+                        input: tc.args,
+                        output: tc.result,
+                      });
+                    }
+                  }
+
+                  currentSubAgentId = null;
+                }
+
+                // 处理 tool-input-available（可能来自主智能体或子智能体）
+                else if (partType === "tool-input-available" || partType === "tool-input-start") {
                   const p = part as { toolCallId: string; toolName?: string; input?: unknown };
+                  const isAgentCall = p.toolName?.startsWith("agent-") || p.toolName?.includes("-agent");
+
+                  if (isAgentCall) {
+                    // 这是子智能体委托调用
+                    currentSubAgentId = p.toolName!.replace(/^agent-/, "");
+                  }
+
                   const entry = {
                     toolCallId: p.toolCallId,
                     toolName: p.toolName || "",
                     state: "running" as const,
                     input: p.input,
+                    agentSource: currentSubAgentId || undefined,
                   };
                   toolMap.set(p.toolCallId, entry);
-                } else if (part.type === "tool-input-delta") {
+                }
+
+                else if (partType === "tool-input-delta") {
                   const p = part as { toolCallId: string; inputTextDelta?: string };
                   const existing = toolMap.get(p.toolCallId);
                   if (existing) {
                     existing.input = (existing.input || "") + (p.inputTextDelta || "");
                   }
-                } else if (part.type === "tool-output-available") {
+                }
+
+                else if (partType === "tool-output-available") {
                   const p = part as { toolCallId: string; output?: unknown; error?: unknown; errorText?: string };
                   const existing = toolMap.get(p.toolCallId);
                   if (existing) {
@@ -149,13 +239,34 @@ function ChatAssistantContent() {
                     if (p.error) existing.errorText = p.errorText || String(p.error);
                   }
                 }
-              }
-              const toolParts = Array.from(toolMap.values());
 
-              const hasTools = toolParts.length > 0;
+                // 处理子智能体执行事件中的文本流（实时输出）
+                else if (partType.startsWith("agent-execution-event-")) {
+                  const eventType = partType.replace("agent-execution-event-", "");
+                  if (eventType === "text-delta" || eventType === "text") {
+                    const p = part as unknown as {
+                      text?: string;
+                      payload?: { text?: string };
+                      agentId?: string;
+                    };
+                    const textContent = p.text || p.payload?.text || "";
+                    const agentId = p.agentId || currentSubAgentId || "sub-agent";
+                    if (textContent) {
+                      subAgentTexts.push({
+                        agentId,
+                        text: textContent,
+                      });
+                    }
+                  }
+                }
+              }
+
+              const toolParts = Array.from(toolMap.values());
+              const hasTools = toolParts.length > 0 || subAgentTools.length > 0;
 
               return (
-                <div key={message.id}>
+                <div key={message.id} className="space-y-2">
+                  {/* Reasoning 部分 */}
                   {hasReasoning && (
                     <Reasoning className="w-full" isStreaming={isReasoningStreaming}>
                       <ReasoningTrigger />
@@ -167,23 +278,63 @@ function ChatAssistantContent() {
                     </Reasoning>
                   )}
 
-                  {/* Tool calls rendered as a group */}
-                  {hasTools && (
+                  {/* 主智能体的工具调用 */}
+                  {toolParts.filter(t => !t.toolName.startsWith("agent-") && !t.toolName.includes("-agent")).length > 0 && (
                     <ToolCalls>
-                      {toolParts.map((t) => (
-                        <ToolCall
-                          key={t.toolCallId}
-                          toolName={t.toolName}
-                          state={t.state}
-                          input={t.input}
-                          output={t.output}
-                          errorText={t.errorText}
-                        />
-                      ))}
+                      {toolParts
+                        .filter(t => !t.toolName.startsWith("agent-") && !t.toolName.includes("-agent"))
+                        .map((t) => (
+                          <ToolCall
+                            key={t.toolCallId}
+                            toolName={t.toolName}
+                            state={t.state}
+                            input={t.input}
+                            output={t.output}
+                            errorText={t.errorText}
+                            agentSource={t.agentSource}
+                          />
+                        ))}
                     </ToolCalls>
                   )}
 
-                  {/* Text messages */}
+                  {/* 子智能体委托调用标识 */}
+                  {toolParts.filter(t => t.toolName.startsWith("agent-") || t.toolName.includes("-agent")).map((t) => (
+                    <AgentSeparator
+                      key={t.toolCallId}
+                      agentId={t.toolName.replace(/^agent-/, "")}
+                      direction={t.state === "complete" ? "end" : "start"}
+                    />
+                  ))}
+
+                  {/* 子智能体的文本输出 - 平级渲染为消息 */}
+                  {subAgentTexts.map((st, idx) => (
+                    <Message key={`sub-text-${idx}`} from="assistant">
+                      <MessageContent>
+                        <div className="flex items-start gap-2">
+                          <AgentSourceBadge agentId={st.agentId} className="mt-1 shrink-0" />
+                          <Response>{st.text}</Response>
+                        </div>
+                      </MessageContent>
+                    </Message>
+                  ))}
+
+                  {/* 子智能体的工具调用 - 平级渲染 */}
+                  {subAgentTools.length > 0 && (
+                    <div className="ml-4 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800/50 space-y-2">
+                      {subAgentTools.map((st) => (
+                        <ToolCall
+                          key={st.toolCallId}
+                          toolName={st.toolName}
+                          state={st.state}
+                          input={st.input}
+                          output={st.output}
+                          agentSource={st.agentId}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 主智能体的文本消息 */}
                   {message.parts.map((part, i) => {
                     if (part.type !== "text") return null;
                     const text = (part as { text: string }).text;

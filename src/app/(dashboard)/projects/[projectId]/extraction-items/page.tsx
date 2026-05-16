@@ -252,7 +252,7 @@ export default function ExtractionItemsPage() {
   const isAllSelected = filtered.length > 0 && selectedIds.size === filtered.length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       <div>
         <h2 className="text-h2">审查项管理</h2>
         <p className="text-muted-foreground">管理项目中所有文档的审查项和检查点</p>

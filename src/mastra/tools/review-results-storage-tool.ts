@@ -1,10 +1,4 @@
-// ⚠️ 此文件已废弃，请使用拆分后的工具：
-// - reviewResultsStorageTool (src/mastra/tools/review-results-storage-tool.ts) - 存储 issues 和 reviewItemResults
-// - reportSummaryStorageTool (src/mastra/tools/report-summary-storage-tool.ts) - 存储 summary
-// - reportStatusUpdateTool (src/mastra/tools/report-status-update-tool.ts) - 更新报告状态
-// - getReportInfoTool (src/mastra/tools/get-report-info-tool.ts) - 获取报告完整信息
-
-// 保留此文件仅为向后兼容，不应再被新代码引用。
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
@@ -102,18 +96,15 @@ async function resolveReviewItemIds(projectId: string, inputIds: string[]): Prom
   return mapping;
 }
 
-export const structuredReviewStorageTool = createTool({
-  id: "structured-review-storage",
-  description: "保存结构化审查结果：写入 report 摘要、问题项、审查项结果，并更新 report 状态。reviewItemId 可使用真实UUID或序号（如 '1', '2'），工具会自动映射。issues 和 reviewItemResults 可以是 JSON 数组或 JSON 字符串。",
+export const reviewResultsStorageTool = createTool({
+  id: "review-results-storage",
+  description: "存储审查项结果和发现的问题。仅由投标文件审查智能体调用。保存 issues（问题列表）和 reviewItemResults（审查项结果），同时更新 score（评分 0-100）和 recommendation（建议结论：pass/fail/revise）。reviewItemId 可使用真实UUID或序号（如 '1', '2'）。",
   inputSchema: z.object({
     reportId: z.string().uuid(),
     score: z.number().min(0).max(100),
     recommendation: z.enum(["pass", "fail", "revise"]),
-    summary: z.string(),
     issues: z.union([z.array(issueSchema), z.string()]).optional(),
     reviewItemResults: z.union([z.array(reviewItemResultSchema), z.string()]).optional(),
-    aiAnalysis: z.record(z.string(), z.unknown()).optional(),
-    modelConfigUsed: z.record(z.string(), z.unknown()).optional(),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -126,13 +117,9 @@ export const structuredReviewStorageTool = createTool({
     reportId,
     score,
     recommendation,
-    summary,
     issues: issuesInput,
     reviewItemResults: reviewResultsInput,
-    aiAnalysis,
-    modelConfigUsed,
   }) => {
-    // 解析可能为字符串的输入
     const parsedIssues = parseFlexibleArray(issuesInput, issueSchema);
     const parsedReviewResults = parseFlexibleArray(reviewResultsInput, reviewItemResultSchema);
 
@@ -172,7 +159,7 @@ export const structuredReviewStorageTool = createTool({
             reportId,
             blockId: issue.blockId && validBlockIds.has(issue.blockId) ? issue.blockId : null,
             checkpointId: issue.checkpointId || null,
-            agentSource: issue.agentSource || "report-generation-agent",
+            agentSource: issue.agentSource || "tender-review-agent",
             category: issue.category,
             severity: issue.severity,
             title: issue.title,
@@ -203,7 +190,7 @@ export const structuredReviewStorageTool = createTool({
         );
       }
 
-      // 统计摘要
+      // 统计摘要并更新报告（不含summary）
       const reviewItemsSummary = {
         total: validReviewResults.length,
         pass: validReviewResults.filter((item) => item.status === "pass").length,
@@ -211,20 +198,14 @@ export const structuredReviewStorageTool = createTool({
         needsManualReview: validReviewResults.filter((item) => item.status === "needs_manual_review").length,
       };
 
-      // 更新报告状态
       await db
         .update(reviewReports)
         .set({
-          status: "completed",
           aiScore: String(score),
           recommendation,
-          summary,
           aiAnalysis: {
-            ...(aiAnalysis || {}),
             reviewItemsSummary,
-            modelConfigUsed: modelConfigUsed || null,
           },
-          completedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(reviewReports.id, reportId));
@@ -234,18 +215,9 @@ export const structuredReviewStorageTool = createTool({
         reportId,
         issueCount: parsedIssues.length,
         reviewItemResultCount: validReviewResults.length,
-        message: `审查结果已保存：${parsedIssues.length}个问题，${validReviewResults.length}个审查项结果`,
+        message: `审查结果已保存：${parsedIssues.length}个问题，${validReviewResults.length}个审查项结果。评分：${score}，建议：${recommendation}`,
       };
     } catch (error) {
-      await db
-        .update(reviewReports)
-        .set({
-          status: "failed",
-          aiAnalysis: { error: error instanceof Error ? error.message : "保存失败" },
-          updatedAt: new Date(),
-        })
-        .where(eq(reviewReports.id, reportId));
-
       return {
         success: false,
         reportId,

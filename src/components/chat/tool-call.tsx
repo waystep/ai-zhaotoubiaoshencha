@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Response } from "./response";
+import { AgentSourceBadge, formatAgentName } from "./agent-separator";
 
 export type ToolCallProps = ComponentProps<"div"> & {
   toolName: string;
@@ -14,23 +16,13 @@ export type ToolCallProps = ComponentProps<"div"> & {
   input?: unknown;
   output?: unknown;
   errorText?: string;
+  /** 来自哪个子智能体（可选），用于显示来源标识 */
+  agentSource?: string;
 };
 
 // 判断是否为子智能体调用
 function isAgentTool(toolName: string): boolean {
-  return toolName.startsWith("agent-");
-}
-
-// 子智能体名称美化
-function formatAgentName(toolName: string): string {
-  const nameMap: Record<string, string> = {
-    "agent-extraction-agent": "审查项提取",
-    "agent-tenderReviewAgent": "投标文件审查",
-    "agent-tenderResponseAgent": "响应项评估",
-    "agent-reportGenerationAgent": "报告生成",
-    "agent-image-review-agent": "图像风险分析",
-  };
-  return nameMap[toolName] || toolName.replace(/^agent-/, "").replace(/-/g, " ");
+  return toolName.startsWith("agent-") || toolName.includes("-agent");
 }
 
 // 根据工具名推断图标
@@ -72,6 +64,27 @@ const getStateLabel = (state?: string) => {
 const truncate = (s: string, max = 500): string =>
   s.length <= max ? s : s.substring(0, max) + "...";
 
+// 检查输出是否包含文本内容
+function hasTextOutput(output: unknown): boolean {
+  if (!output) return false;
+  if (typeof output === "string" && output.length > 50) return true;
+  if (typeof output === "object") {
+    const data = output as Record<string, unknown>;
+    if (data.text && typeof data.text === "string" && data.text.length > 50) return true;
+  }
+  return false;
+}
+
+// 获取输出中的文本内容
+function getTextOutput(output: unknown): string | null {
+  if (typeof output === "string") return output;
+  if (typeof output === "object" && output !== null) {
+    const data = output as Record<string, unknown>;
+    if (data.text && typeof data.text === "string") return data.text;
+  }
+  return null;
+}
+
 export const ToolCall = ({
   toolName,
   state,
@@ -85,73 +98,55 @@ export const ToolCall = ({
   const hasDetails = (input != null || output != null || !!errorText) && state !== "running";
 
   return (
-    <Collapsible defaultOpen={state === "running"} className={cn(
-      "rounded-lg border text-sm",
-      agent && "border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/40 dark:bg-indigo-950/20",
-      !agent && state === "error"
-        ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30"
-        : !agent && state === "complete"
-        ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/30"
-        : !agent && state === "running"
-        ? "border-primary/50 bg-primary/5"
-        : !agent && "border-yellow-200 bg-yellow-50 dark:border-yellow-900/40 dark:bg-yellow-950/30",
-      className
-    )} {...props}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 p-3 cursor-pointer hover:bg-muted/30 transition-colors">
-        {getStateIcon(state)}
-        <span className={cn(
-          agent ? "text-indigo-700 dark:text-indigo-300" :
-          state === "error" ? "text-red-700 dark:text-red-300" :
-          state === "complete" ? "text-green-700 dark:text-green-300" :
-          state === "running" ? "text-primary" :
-          "text-yellow-700 dark:text-yellow-300"
-        )}>
-          {getToolIcon(toolName)}
-        </span>
-        <span className={cn(
-          "font-medium",
-          agent ? "text-indigo-800 dark:text-indigo-200" :
-          state === "error" ? "text-red-700 dark:text-red-300" :
-          state === "complete" ? "text-green-700 dark:text-green-300" :
-          state === "running" ? "text-primary" :
-          "text-yellow-700 dark:text-yellow-300"
-        )}>
+    <div className={className} {...props}>
+      <Collapsible defaultOpen={false} className={cn(
+        "rounded border text-[11px] transition-colors",
+        state === "error"
+          ? "border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20"
+          : state === "complete"
+          ? "border-muted bg-muted/20"
+          : state === "running"
+          ? "border-primary/30 bg-primary/5 animate-pulse"
+          : "border-muted bg-muted/20"
+      )}>
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 p-1.5 cursor-pointer hover:bg-muted/30 transition-colors rounded-t">
+        <span className="text-muted-foreground shrink-0">{getStateIcon(state)}</span>
+        <span className="text-muted-foreground shrink-0">{getToolIcon(toolName)}</span>
+        <span className="truncate text-muted-foreground">
           {agent ? formatAgentName(toolName) : toolName.replace(/^tool-/, "").replace(/([A-Z])/g, " $1").trim()}
         </span>
-        <span className="text-muted-foreground text-xs">({getStateLabel(state)})</span>
         {hasDetails && (
-          <ChevronDownIcon className="size-4 ml-auto transition-transform text-muted-foreground group-data-[state=open]:rotate-180" />
+          <ChevronDownIcon className="size-3 ml-auto transition-transform text-muted-foreground/50 group-data-[state=open]:rotate-180" />
         )}
       </CollapsibleTrigger>
 
       {hasDetails && (
-        <CollapsibleContent className="px-3 pb-3">
+        <CollapsibleContent className="px-2 pb-2">
           {input != null && (
-            <div className="mt-2">
-              <p className="text-xs text-muted-foreground mb-1">
-                {agent ? "委托内容:" : "输入:"}
-              </p>
-              <pre className="overflow-auto rounded bg-muted/50 p-2 text-xs max-h-[400px] whitespace-pre-wrap">
-                {typeof input === "string" ? input : JSON.stringify(input, null, 2)}
+            <div className="mt-1">
+              <p className="text-[10px] text-muted-foreground mb-0.5">输入</p>
+              <pre className="overflow-auto rounded bg-muted/50 p-1.5 text-[10px] max-h-[200px] whitespace-pre-wrap">
+                {typeof input === "string" ? truncate(input, 300) : JSON.stringify(input, null, 2)}
               </pre>
             </div>
           )}
+
           {output != null && state === "complete" && (
-            <div className="mt-2">
-              <p className="text-xs text-muted-foreground mb-1">
-                {agent ? "子智能体回复:" : "输出:"}
-              </p>
-              <pre className="overflow-auto rounded bg-green-100/50 dark:bg-green-900/20 p-2 text-xs max-h-[600px] whitespace-pre-wrap">
-                {typeof output === "string" ? output : JSON.stringify(output, null, 2)}
+            <div className="mt-1">
+              <p className="text-[10px] text-muted-foreground mb-0.5">输出</p>
+              <pre className="overflow-auto rounded bg-muted/50 p-1.5 text-[10px] max-h-[200px] whitespace-pre-wrap">
+                {typeof output === "string" ? truncate(output, 300) : JSON.stringify(output, null, 2)}
               </pre>
             </div>
           )}
+
           {errorText && (
-            <div className="mt-2 text-xs text-red-600 dark:text-red-300">错误: {errorText}</div>
+            <div className="mt-1 text-[10px] text-red-600 dark:text-red-300">错误: {errorText}</div>
           )}
         </CollapsibleContent>
       )}
     </Collapsible>
+  </div>
   );
 };
 

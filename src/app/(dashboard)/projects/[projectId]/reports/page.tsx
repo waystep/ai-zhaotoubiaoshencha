@@ -297,9 +297,9 @@ export default function ProjectReportsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       {/* 紧凑筛选条 */}
-      <div className="sticky top-0 z-10 -mx-6 border-b bg-background/95 backdrop-blur px-6 py-3">
+      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 backdrop-blur px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <Input
             value={q}
