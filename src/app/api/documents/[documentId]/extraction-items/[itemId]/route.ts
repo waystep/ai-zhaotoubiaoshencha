@@ -1,9 +1,9 @@
 // 单个提取项的操作 — 更新 / 删除
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
 import { extractionItems, documents } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { InferInsertModel } from "drizzle-orm";
 
 interface RouteContext {
@@ -11,10 +11,10 @@ interface RouteContext {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { documentId, itemId } = await context.params;
+  const access = await requireDocumentAccess(documentId);
+  if (isAuthFailure(access)) return access.response;
+
   const body = await request.json();
 
   const updates: Partial<InferInsertModel<typeof extractionItems>> = { updatedAt: new Date() };
@@ -27,7 +27,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const [updated] = await db
     .update(extractionItems)
     .set(updates)
-    .where(eq(extractionItems.id, itemId))
+    .where(and(eq(extractionItems.id, itemId), eq(extractionItems.documentId, documentId)))
     .returning();
 
   if (!updated) return NextResponse.json({ error: "提取项不存在" }, { status: 404 });
@@ -35,13 +35,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { documentId, itemId } = await context.params;
+  const access = await requireDocumentAccess(documentId);
+  if (isAuthFailure(access)) return access.response;
+
   const [deleted] = await db
     .delete(extractionItems)
-    .where(eq(extractionItems.id, itemId))
+    .where(and(eq(extractionItems.id, itemId), eq(extractionItems.documentId, documentId)))
     .returning({ id: extractionItems.id });
 
   if (!deleted) return NextResponse.json({ error: "提取项不存在" }, { status: 404 });

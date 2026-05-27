@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
-import { documentBlocks, documentParsedResults, documents } from "@/lib/db/schema";
+import { documentBlocks, documentParsedResults } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 interface RouteContext {
@@ -13,14 +13,12 @@ export async function GET(
   request: Request,
   context: RouteContext
 ) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { documentId } = await context.params;
 
   try {
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
+
     // 获取文档解析结果
     const parsedResult = await db.query.documentParsedResults.findFirst({
       where: eq(documentParsedResults.documentId, documentId),

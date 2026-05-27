@@ -1,7 +1,7 @@
 import { db } from "@/lib/db/client";
 import { documents, extractionItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { mastra } from "@/mastra";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 
 interface RouteContext {
   params: Promise<{ documentId: string }>;
@@ -13,12 +13,10 @@ interface RouteContext {
 export async function POST(request: Request, context: RouteContext) {
   const { documentId } = await context.params;
 
-  // 获取文档信息（不校验 auth，由 SSE 的 onError 处理）
-  const doc = await db.query.documents.findFirst({
-    where: eq(documents.id, documentId),
-    with: { project: true },
-  });
-  if (!doc) return Response.json({ error: "文档不存在" }, { status: 404 });
+  const access = await requireDocumentAccess(documentId);
+  if (isAuthFailure(access)) return access.response;
+  const doc = access.document;
+
   if (doc.parseStatus !== "completed") return Response.json({ error: "文档尚未解析" }, { status: 400 });
   if (doc.docType === "bid_doc") return Response.json({ error: "投标文件无需提取" }, { status: 400 });
 
@@ -28,9 +26,10 @@ export async function POST(request: Request, context: RouteContext) {
 项目ID: ${doc.projectId}
 文档ID: ${documentId}
 文档名称: ${doc.name}
-文档类型: ${doc.docType}
+  文档类型: ${doc.docType}
 `;
 
+  const { mastra } = await import("@/mastra");
   const agent = mastra.getAgent("extraction-agent");
   const stream = await agent.stream(prompt, { maxSteps: 25 });
 
@@ -110,11 +109,9 @@ export async function POST(request: Request, context: RouteContext) {
 export async function GET(request: Request, context: RouteContext) {
   const { documentId } = await context.params;
   try {
-    const doc = await db.query.documents.findFirst({
-      where: eq(documents.id, documentId),
-      with: { project: true },
-    });
-    if (!doc) return Response.json({ error: "文档不存在" }, { status: 404 });
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
+    const doc = access.document;
 
     const items = await db.query.extractionItems.findMany({
       where: eq(extractionItems.documentId, documentId),

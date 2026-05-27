@@ -3,10 +3,10 @@ import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { createUIMessageStreamResponse, type UIMessage } from "ai";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireReportAccess } from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
 import { reviewReports } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { mastra } from "@/mastra";
 
 export const maxDuration = 300;
 
@@ -76,9 +76,16 @@ export async function POST(req: Request) {
   const isStartReview = body.command === "start-review";
 
   try {
+    if (reportId) {
+      const access = await requireReportAccess(reportId);
+      if (isAuthFailure(access)) return access.response;
+    }
+
     if (reportId && isStartReview) {
       await markReportInProgress(reportId);
     }
+
+    const { mastra } = await import("@/mastra");
 
     const stream = await handleChatStream({
       mastra,
@@ -118,7 +125,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const threadId = url.searchParams.get("threadId") || url.searchParams.get("reportId");
   const resourceId = url.searchParams.get("resourceId") || url.searchParams.get("reportId");
+  const reportId = url.searchParams.get("reportId");
 
+  if (reportId) {
+    const access = await requireReportAccess(reportId);
+    if (isAuthFailure(access)) return access.response;
+  }
+
+  const { mastra } = await import("@/mastra");
   const memory = await mastra.getAgentById("tender-review-supervisor").getMemory();
   let response = null;
 

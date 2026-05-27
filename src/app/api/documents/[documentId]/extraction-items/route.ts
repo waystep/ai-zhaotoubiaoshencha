@@ -1,6 +1,6 @@
 // 提取项管理 API — 手动 CRUD
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
 import { extractionItems, documents } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -10,10 +10,10 @@ interface RouteContext {
 }
 
 export async function GET(request: Request, context: RouteContext) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { documentId } = await context.params;
+  const access = await requireDocumentAccess(documentId);
+  if (isAuthFailure(access)) return access.response;
+
   const items = await db.query.extractionItems.findMany({
     where: eq(extractionItems.documentId, documentId),
     orderBy: (fields, { asc }) => [asc(fields.createdAt)],
@@ -22,17 +22,17 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { documentId } = await context.params;
+  const access = await requireDocumentAccess(documentId);
+  if (isAuthFailure(access)) return access.response;
+
   const body = await request.json();
 
   const [item] = await db
     .insert(extractionItems)
     .values({
       documentId,
-      projectId: body.projectId,
+      projectId: access.document.projectId,
       section: body.section || null,
       title: body.title || "",
       checkpoint: body.checkpoint || "",

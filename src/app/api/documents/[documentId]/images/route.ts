@@ -1,9 +1,9 @@
 // 图片风险分析查询与重分析 API
 import { db } from "@/lib/db/client";
 import { imageRiskAnalysis } from "@/lib/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 import type { InferInsertModel } from "drizzle-orm";
 
 interface RouteContext {
@@ -16,12 +16,9 @@ interface RouteContext {
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "未授权" }, { status: 401 });
-    }
-
     const { documentId } = await context.params;
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
 
     const imageRisks = await db.query.imageRiskAnalysis.findMany({
       where: eq(imageRiskAnalysis.documentId, documentId),
@@ -53,18 +50,21 @@ export async function GET(request: Request, context: RouteContext) {
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "未授权" }, { status: 401 });
-
     const { documentId } = await context.params;
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
+
     const { imageId } = await request.json();
 
     if (!imageId) return NextResponse.json({ error: "缺少 imageId" }, { status: 400 });
 
-    await db
+    const [updated] = await db
       .update(imageRiskAnalysis)
       .set({ status: "pending", error: null, updatedAt: new Date() } as Partial<InferInsertModel<typeof imageRiskAnalysis>>)
-      .where(eq(imageRiskAnalysis.id, imageId));
+      .where(and(eq(imageRiskAnalysis.id, imageId), eq(imageRiskAnalysis.documentId, documentId)))
+      .returning({ id: imageRiskAnalysis.id });
+
+    if (!updated) return NextResponse.json({ error: "图片不存在" }, { status: 404 });
 
     return NextResponse.json({ success: true, imageId });
   } catch (error) {
@@ -79,15 +79,12 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "未授权" }, { status: 401 });
-    }
-
     const { documentId } = await context.params;
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
 
     // 将所有非 pending 的图片重置（包括卡在 processing 的）
-    const result = await db
+    await db
       .update(imageRiskAnalysis)
       .set({
         status: "pending",

@@ -1,6 +1,10 @@
 // 单个提取项操作 API — 更新 / 删除（不依赖 documentId）
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import {
+  isAuthFailure,
+  requireDocumentAccess,
+  requireExtractionItemAccess,
+} from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
 import { extractionItems, documents } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -10,10 +14,10 @@ interface RouteContext {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { itemId } = await context.params;
+  const access = await requireExtractionItemAccess(itemId);
+  if (isAuthFailure(access)) return access.response;
+
   const body = await request.json();
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -22,7 +26,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (body.checkpoint !== undefined) updates.checkpoint = body.checkpoint;
   if (body.consequence !== undefined) updates.consequence = String(body.consequence);
   if (body.blocks !== undefined) updates.blocks = body.blocks;
-  if (body.documentId !== undefined) updates.documentId = body.documentId || null;
+  if (body.documentId !== undefined) {
+    if (body.documentId) {
+      const documentAccess = await requireDocumentAccess(body.documentId);
+      if (isAuthFailure(documentAccess)) return documentAccess.response;
+      if (documentAccess.document.projectId !== access.item.projectId) {
+        return NextResponse.json({ error: "文档不属于该提取项项目" }, { status: 400 });
+      }
+    }
+    updates.documentId = body.documentId || null;
+  }
 
   const [updated] = await db
     .update(extractionItems)
@@ -35,10 +48,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { itemId } = await context.params;
+  const access = await requireExtractionItemAccess(itemId);
+  if (isAuthFailure(access)) return access.response;
 
   const existing = await db.query.extractionItems.findFirst({
     where: eq(extractionItems.id, itemId),

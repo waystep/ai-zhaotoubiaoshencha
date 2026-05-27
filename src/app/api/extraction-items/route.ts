@@ -1,6 +1,10 @@
 // 全局提取项 API — 不强制关联 document
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import {
+  isAuthFailure,
+  requireDocumentAccess,
+  requireProjectAccess,
+} from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
 import { extractionItems, documents } from "@/lib/db/schema";
 import { eq, sql, isNull, and } from "drizzle-orm";
@@ -10,6 +14,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get("projectId");
   if (!projectId) return NextResponse.json({ items: [] });
+
+  const access = await requireProjectAccess(projectId);
+  if (isAuthFailure(access)) return access.response;
 
   const items = await db.query.extractionItems.findMany({
     where: and(
@@ -22,10 +29,21 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await request.json();
+  if (!body.projectId) {
+    return NextResponse.json({ error: "缺少 projectId" }, { status: 400 });
+  }
+
+  const projectAccess = await requireProjectAccess(body.projectId);
+  if (isAuthFailure(projectAccess)) return projectAccess.response;
+
+  if (body.documentId) {
+    const documentAccess = await requireDocumentAccess(body.documentId);
+    if (isAuthFailure(documentAccess)) return documentAccess.response;
+    if (documentAccess.document.projectId !== body.projectId) {
+      return NextResponse.json({ error: "文档不属于该项目" }, { status: 400 });
+    }
+  }
 
   const [item] = await db
     .insert(extractionItems)

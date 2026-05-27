@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { mastra } from "@/mastra";
+import {
+  isAuthFailure,
+  requireDocumentAccess,
+  requireProjectAccess,
+} from "@/lib/auth/guards";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +20,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const projectAccess = await requireProjectAccess(projectId);
+    if (isAuthFailure(projectAccess)) return projectAccess.response;
+
+    const documentAccess = await requireDocumentAccess(bidDocumentId);
+    if (isAuthFailure(documentAccess)) return documentAccess.response;
+    if (documentAccess.document.projectId !== projectId) {
+      return NextResponse.json({ error: "文档不属于该项目" }, { status: 400 });
+    }
+
+    const { mastra } = await import("@/mastra");
     const agent = mastra.getAgentById("tender-review-agent");
 
     const prompt = `

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 import { getImagePath } from "@/lib/storage/image-storage";
 import fs from "fs";
 
@@ -16,13 +16,12 @@ export async function GET(
   request: Request,
   context: RouteContext
 ) {
-  // 图片访问不需要严格认证（图片 URL 可能嵌入在内容中）
-  // 但可以添加可选的认证检查
-  const session = await auth();
-
   const { documentId, filename } = await context.params;
 
   try {
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
+
     // 获取图片路径
     const imagePath = getImagePath(documentId, filename);
 
@@ -53,7 +52,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=31536000", // 缓存一年
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

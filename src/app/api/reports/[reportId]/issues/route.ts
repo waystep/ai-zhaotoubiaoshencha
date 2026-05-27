@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireReportAccess } from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
-import { reviewIssues, reviewReports } from "@/lib/db/schema";
+import { reviewIssues } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { createIssueSchema } from "@/types/review";
 
@@ -14,14 +14,12 @@ export async function GET(
   request: Request,
   context: RouteContext
 ) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { reportId } = await context.params;
 
   try {
+    const access = await requireReportAccess(reportId);
+    if (isAuthFailure(access)) return access.response;
+
     const issues = await db.query.reviewIssues.findMany({
       where: eq(reviewIssues.reportId, reportId),
       orderBy: [
@@ -45,22 +43,11 @@ export async function POST(
   request: Request,
   context: RouteContext
 ) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { reportId } = await context.params;
 
   try {
-    // 验证报告存在
-    const report = await db.query.reviewReports.findFirst({
-      where: eq(reviewReports.id, reportId),
-    });
-
-    if (!report) {
-      return NextResponse.json({ error: "报告不存在" }, { status: 404 });
-    }
+    const access = await requireReportAccess(reportId);
+    if (isAuthFailure(access)) return access.response;
 
     const body = await request.json();
     const validatedData = createIssueSchema.parse({

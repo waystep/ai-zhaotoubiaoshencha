@@ -1,17 +1,15 @@
 import { handleChatStream } from "@mastra/ai-sdk";
 import { createUIMessageStreamResponse } from "ai";
 
-import { mastra } from "@/mastra";
-import { auth } from "@/lib/auth/config";
+import {
+  isAuthFailure,
+  requireDocumentAccess,
+  requireProjectAccess,
+} from "@/lib/auth/guards";
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const {
       reportId,
@@ -35,6 +33,17 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    const projectAccess = await requireProjectAccess(projectId);
+    if (isAuthFailure(projectAccess)) return projectAccess.response;
+
+    const documentAccess = await requireDocumentAccess(targetBidDocumentId);
+    if (isAuthFailure(documentAccess)) return documentAccess.response;
+    if (documentAccess.document.projectId !== projectId) {
+      return Response.json({ error: "文档不属于该项目" }, { status: 400 });
+    }
+
+    const { mastra } = await import("@/mastra");
 
     const reviewPrompt = `
 请审查该项目中的投标文件，并将结构化结果保存到数据库。

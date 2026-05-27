@@ -73,6 +73,10 @@ export async function saveImages(
  * 获取图片文件路径
  */
 export function getImagePath(documentId: string, filename: string): string | null {
+  if (filename !== path.basename(filename)) {
+    return null;
+  }
+
   const filePath = path.join(IMAGES_DIR, documentId, filename);
 
   if (fs.existsSync(filePath)) {

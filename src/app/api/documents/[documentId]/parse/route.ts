@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { isAuthFailure, requireDocumentAccess } from "@/lib/auth/guards";
 import { db } from "@/lib/db/client";
 import {
   documents,
@@ -26,22 +26,12 @@ export async function POST(
   request: Request,
   context: RouteContext
 ) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { documentId } = await context.params;
 
   try {
-    // 获取文档信息
-    const doc = await db.query.documents.findFirst({
-      where: eq(documents.id, documentId),
-    });
-
-    if (!doc) {
-      return NextResponse.json({ error: "文档不存在" }, { status: 404 });
-    }
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
+    const doc = access.document;
 
     // 验证文件存在（关键！防止假数据）
     if (!fs.existsSync(doc.storagePath)) {
@@ -158,14 +148,12 @@ export async function GET(
   request: Request,
   context: RouteContext
 ) {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { documentId } = await context.params;
 
   try {
+    const access = await requireDocumentAccess(documentId);
+    if (isAuthFailure(access)) return access.response;
+
     // 获取文档信息
     const doc = await db.query.documents.findFirst({
       where: eq(documents.id, documentId),
