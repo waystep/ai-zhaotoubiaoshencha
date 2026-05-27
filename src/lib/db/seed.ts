@@ -2,9 +2,31 @@ import "dotenv/config";
 
 import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
+import { getConnectionString as getNetlifyConnectionString } from "@netlify/database";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
-import { db } from "./client";
+import * as schema from "./schema";
 import { organizationMembers, organizations, users } from "./schema";
+
+function getSeedConnectionString() {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  if (process.env.NETLIFY_DB_URL) {
+    return getNetlifyConnectionString();
+  }
+
+  throw new Error("DATABASE_URL or NETLIFY_DB_URL is required to seed the database.");
+}
+
+const seedClient = postgres(getSeedConnectionString(), {
+  max: 1,
+  idle_timeout: 5,
+  connect_timeout: 10,
+});
+const db = drizzle(seedClient, { schema });
 
 const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@ai-shencha.local";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD || "Admin@123456";
@@ -102,10 +124,6 @@ async function ensureMembership(orgId: string, userId: string) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required to seed the database.");
-  }
-
   const org = await upsertDemoOrg();
   const admin = await upsertAdminUser();
   await ensureMembership(org.id, admin.id);
@@ -121,6 +139,7 @@ main()
     console.error("Seed failed:", error);
     process.exitCode = 1;
   })
-  .finally(() => {
+  .finally(async () => {
+    await seedClient.end({ timeout: 5 });
     process.exit();
   });

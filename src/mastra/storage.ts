@@ -1,9 +1,14 @@
 // Mastra Storage 配置 - 避免循环依赖
 import { PostgresStore, PgVector } from "@mastra/pg";
+import { getConnectionString as getNetlifyConnectionString } from "@netlify/database";
 
 function getConnectionString() {
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
+  }
+
+  if (process.env.NETLIFY_DB_URL) {
+    return getNetlifyConnectionString();
   }
 
   if (process.env.NEXT_PHASE === "phase-production-build") {
