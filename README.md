@@ -138,9 +138,17 @@ npm run worker       # 启动后台 Worker
 npm run db:generate  # 生成数据库迁移
 npm run db:migrate   # 执行迁移
 npm run db:push      # 直接推送 Schema
+npm run db:seed      # 创建/更新演示管理员账号
 npm run db:studio    # 打开 Drizzle Studio
 
 npm run mastra:dev   # 启动 Mastra Studio
+```
+
+默认演示管理员账号可通过环境变量覆盖：
+
+```bash
+SEED_ADMIN_EMAIL=admin@ai-shencha.local
+SEED_ADMIN_PASSWORD=Admin@123456
 ```
 
 ## 技术文档
@@ -149,6 +157,8 @@ npm run mastra:dev   # 启动 Mastra Studio
 
 | 文档 | 位置 | 说明 |
 |------|------|------|
+| Why 文档 | `Why.md` | 用户、场景、验证、方法论 |
+| SDD 体系 | `docs/SDD.md` | 2.0 迭代的规范驱动开发体系 |
 | 系统架构 | `docs/architecture/系统架构文档.md` | 整体架构设计 |
 | 数据库设计 | `docs/database/数据库设计.md` | Schema 和关系说明 |
 | 配置说明 | `docs/config/配置说明.md` | 环境变量和配置 |
