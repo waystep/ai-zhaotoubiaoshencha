@@ -32,10 +32,12 @@ const sectionSchema = z.object({
 export const bidDocumentStorageTool = createTool({
   id: "bid-document-storage",
   description:
-    "存储生成的投标文档到数据库。输入项目ID、章节内容数组和元数据，返回文档ID。",
+    "存储投标文档到数据库。输入项目ID、章节内容数组和元数据，返回文档ID。支持存储生成文档和上传解析文档。",
   inputSchema: z.object({
     projectId: z.string().uuid().describe("项目ID"),
     title: z.string().describe("文档标题"),
+    source: z.enum(["generated", "uploaded"]).default("generated").describe("文档来源：generated=生成的，uploaded=上传解析的"),
+    documentFileId: z.string().uuid().optional().describe("关联的上传文档ID（source=uploaded时传入）"),
     sections: z.array(sectionSchema).describe("章节内容数组"),
     metadata: z
       .object({
@@ -57,7 +59,7 @@ export const bidDocumentStorageTool = createTool({
     success: z.boolean(),
     message: z.string(),
   }),
-  execute: async ({ projectId, title, sections, metadata, createdById }) => {
+  execute: async ({ projectId, title, source, documentFileId, sections, metadata, createdById }) => {
     try {
       if (!sections || sections.length === 0) {
         return {
@@ -87,7 +89,8 @@ export const bidDocumentStorageTool = createTool({
         .values({
           projectId,
           title,
-          source: "generated",
+          source: source ?? "generated",
+          documentFileId: documentFileId ?? null,
           sections: sectionsWithIds,
           metadata: metadata ?? {},
           version: 1,
