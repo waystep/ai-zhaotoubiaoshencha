@@ -14,6 +14,9 @@ import { tenderParsingAgent } from "./agents/tender-parsing-agent";
 import { bidGenerationAgent } from "./agents/bid-generation-agent";
 import { bidParsingAgent } from "./agents/bid-parsing-agent";
 import { bidReviewAgent } from "./agents/bid-review-agent";
+import { riskLocationAgent } from "./agents/risk-location-agent";
+import { legalParsingAgent } from "./agents/legal-parsing-agent";
+import { reportGenerationAgentV2 } from "./agents/report-generation-agent-v2";
 
 // ========== Memory 配置（共享给所有Agent）==========
 const defaultMemory = new Memory({
@@ -54,6 +57,15 @@ export const mastra = new Mastra({
 
     // A3 Bid Review Agent - 投标预审专家
     "bid-review-agent": bidReviewAgent,
+
+    // A4 Risk Location Agent - 风险定位专家
+    "risk-location-agent": riskLocationAgent,
+
+    // A5 Legal Parsing Agent - 法规解析专家
+    "legal-parsing-agent": legalParsingAgent,
+
+    // A6 Report Generation Agent V2 - 预审报告生成专家
+    "report-generation-agent-v2": reportGenerationAgentV2,
 
     // 专业审查智能体（子Agent）
     "image-review-agent": imageReviewAgent,
