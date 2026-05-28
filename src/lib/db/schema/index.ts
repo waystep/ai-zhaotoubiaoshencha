@@ -117,6 +117,7 @@ export const bidStatusEnum = pgEnum("bid_status", [
 // ==================== 用户与认证 ====================
 
 import { loginMethodEnum } from "./enums";
+import { bidDocuments as _bidDocuments } from "./bid-documents";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -757,6 +758,7 @@ export const tenderProjectsRelations = relations(tenderProjects, ({ one, many })
   bidSubmissions: many(bidSubmissions),
   reviewItems: many(reviewItems),
   responseItems: many(responseItems),
+  bidDocuments: many(_bidDocuments),
 }));
 
 export const documentsRelations = relations(documents, ({ one, many }) => ({
@@ -976,3 +978,10 @@ export {
   ruleSetsRelations,
   ruleItemsRelations,
 } from "./rules";
+
+// ==================== 投标文档管理（re-export from bid-documents.ts） ====================
+
+export {
+  bidDocuments,
+  bidDocumentsRelations,
+} from "./bid-documents";
