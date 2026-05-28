@@ -938,3 +938,19 @@ export {
   userOAuthIdentitiesRelations,
   loginLogsRelations,
 } from "./auth";
+
+// ==================== 模型管理（re-export from models.ts） ====================
+
+export {
+  modelTypeEnum,
+  aiModels,
+  agentDefinitions,
+  agentModelBindings,
+  presetModes,
+  agentCallLogs,
+  aiModelsRelations,
+  agentDefinitionsRelations,
+  agentModelBindingsRelations,
+  presetModesRelations,
+  agentCallLogsRelations,
+} from "./models";

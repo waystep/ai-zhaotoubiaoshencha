@@ -29,6 +29,13 @@
       "when": 1779968944542,
       "tag": "0003_fast_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779969317165,
+      "tag": "0004_deep_captain_stacy",
+      "breakpoints": true
     }
   ]
 }
