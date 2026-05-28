@@ -7,6 +7,7 @@ import { db } from "@/lib/db/client";
 import { users, organizationMembers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { PhoneCredentialsProvider } from "@/lib/auth/providers/phone";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: DrizzleAdapter(db),
@@ -64,6 +65,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       },
     }),
+    PhoneCredentialsProvider,
   ],
   session: {
     strategy: "jwt",
