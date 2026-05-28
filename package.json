@@ -98,6 +98,7 @@
     "react-jsx-parser": "^2.4.1",
     "react-pdf": "^9.2.1",
     "reactflow": "^11.11.0",
+    "recharts": "^3.8.1",
     "shiki": "^4.0.2",
     "streamdown": "^2.5.0",
     "superjson": "^2.2.0",
