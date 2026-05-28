@@ -17,6 +17,7 @@ import { bidReviewAgent } from "./agents/bid-review-agent";
 import { riskLocationAgent } from "./agents/risk-location-agent";
 import { legalParsingAgent } from "./agents/legal-parsing-agent";
 import { reportGenerationAgentV2 } from "./agents/report-generation-agent-v2";
+import { workflowSupervisor } from "./agents/workflow-supervisor";
 
 // ========== Memory 配置（共享给所有Agent）==========
 const defaultMemory = new Memory({
@@ -73,6 +74,9 @@ export const mastra = new Mastra({
 
     // 保留旧智能体（向后兼容）
     "tender-review-agent": tenderReviewAgent,
+
+    // Workflow Supervisor - 工作流总协调者
+    "workflow-supervisor": workflowSupervisor,
   },
 
   editor: new MastraEditor(),
