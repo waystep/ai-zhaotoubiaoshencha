@@ -23,7 +23,32 @@
       "Bash(node -e ' *)",
       "Bash(mkdir -p \"D:\\\\Projects\\\\Looma\\\\src\\\\app\\\\api\\\\documents\\\\[documentId]\\\\embeddings\")",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Skill(lark-doc)",
+      "Skill(lark-doc:*)",
+      "Skill(lark-drive)",
+      "Skill(lark-drive:*)",
+      "Bash(LARK_CLI_NO_PROXY=1 lark-cli drive +create-folder --name \"智能招投标平台\")",
+      "Bash(lark-cli --version)",
+      "Bash(lark-cli drive *)",
+      "Bash(lark-cli docs *)",
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/admin/sso/[id]\")",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/auth/sso/[providerId]\")",
+      "Bash(grep -r \"db\\\\.execute\\\\|sql\\\\`\" \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/\" --include=\"*.ts\" -l)",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/admin/knowledge-bases/[id]/items/[itemId]/vectorize\")",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/admin/knowledge-bases/[id]/search\")",
+      "mcp__ide__getDiagnostics",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); console.log\\(Object.keys\\(l\\).filter\\(k => k.toLowerCase\\(\\).includes\\('vector'\\) || k.toLowerCase\\(\\).includes\\('brain'\\) || k.toLowerCase\\(\\).includes\\('spark'\\) || k.toLowerCase\\(\\).includes\\('database'\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(npx next *)",
+      "Bash(git push *)",
+      "Bash(git status)",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/projects/[projectId]/draft/export-word\")",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/projects/[projectId]/draft/import-word\")",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/projects/[projectId]/draft\")",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/v1/projects/[id]/outputs/[type]\")",
+      "Bash(mkdir -p \"/Users/wonderway/Desktop/AI 项目/03上海建工/开发项目/ai-shencha-personal-dev/src/app/api/v1/schemas/[type]\")"
     ]
   }
 }

@@ -985,3 +985,13 @@ export {
   bidDocuments,
   bidDocumentsRelations,
 } from "./bid-documents";
+
+// ==================== Webhook 管理（re-export from webhooks.ts） ====================
+
+export {
+  webhookEvents,
+  webhooks,
+  webhookDeliveryLogs,
+  webhooksRelations,
+  webhookDeliveryLogsRelations,
+} from "./webhooks";
