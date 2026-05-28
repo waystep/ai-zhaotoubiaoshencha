@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { PhoneCredentialsProvider } from "@/lib/auth/providers/phone";
 import { FeishuOAuthProvider } from "@/lib/auth/providers/feishu";
+import { WeChatOAuthProvider } from "@/lib/auth/providers/wechat";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: DrizzleAdapter(db),
@@ -68,6 +69,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
     PhoneCredentialsProvider,
     FeishuOAuthProvider,
+    WeChatOAuthProvider,
   ],
   session: {
     strategy: "jwt",
