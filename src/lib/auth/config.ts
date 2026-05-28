@@ -8,6 +8,7 @@ import { users, organizationMembers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { PhoneCredentialsProvider } from "@/lib/auth/providers/phone";
+import { FeishuOAuthProvider } from "@/lib/auth/providers/feishu";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: DrizzleAdapter(db),
@@ -66,6 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
     PhoneCredentialsProvider,
+    FeishuOAuthProvider,
   ],
   session: {
     strategy: "jwt",
