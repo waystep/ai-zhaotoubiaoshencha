@@ -6,6 +6,7 @@ import postgres from "postgres";
 
 import * as schema from "../schema";
 import { seedAgents } from "./agents";
+import { seedKnowledge } from "./knowledge";
 import { seedModels } from "./models";
 
 function getSeedConnectionString() {
@@ -32,6 +33,7 @@ const db = drizzle(seedClient, { schema });
 async function main() {
   await seedModels(db);
   await seedAgents(db);
+  await seedKnowledge(db);
 
   console.log("Seed completed.");
 }
