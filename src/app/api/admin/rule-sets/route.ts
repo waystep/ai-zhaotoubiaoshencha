@@ -8,7 +8,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { eq, and, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
+import { db } from "@/lib/db/client";
+import { ruleSets, ruleItems, agentDefinitions } from "@/lib/db/schema";
 import { ruleService } from "@/lib/services/rule-service";
 import type { CreateSetInput } from "@/lib/services/rule-service";
 
@@ -44,7 +47,44 @@ export async function GET(request: NextRequest) {
 
     const sets = await ruleService.listSets(organizationId);
 
-    return NextResponse.json({ data: sets });
+    // Fetch rule counts per set
+    const ruleCounts = await db
+      .select({
+        ruleSetId: ruleItems.ruleSetId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(ruleItems)
+      .groupBy(ruleItems.ruleSetId);
+
+    const countMap = new Map<string, number>();
+    for (const rc of ruleCounts) {
+      countMap.set(rc.ruleSetId, rc.count);
+    }
+
+    // Fetch agent names for all referenced agents
+    const agentIds = [...new Set(sets.map((s) => s.agentId).filter(Boolean))] as string[];
+    const agentMap = new Map<string, { agentKey: string; name: string }>();
+
+    if (agentIds.length > 0) {
+      const agents = await db
+        .select({ id: agentDefinitions.id, agentKey: agentDefinitions.agentKey, name: agentDefinitions.name })
+        .from(agentDefinitions)
+        .where(sql`${agentDefinitions.id} IN ${agentIds}`);
+
+      for (const a of agents) {
+        agentMap.set(a.id, { agentKey: a.agentKey, name: a.name });
+      }
+    }
+
+    // Enrich the response
+    const enriched = sets.map((s) => ({
+      ...s,
+      ruleCount: countMap.get(s.id) ?? 0,
+      agentName: s.agentId ? (agentMap.get(s.agentId)?.name ?? null) : null,
+      agentKey: s.agentId ? (agentMap.get(s.agentId)?.agentKey ?? null) : null,
+    }));
+
+    return NextResponse.json({ data: enriched });
   } catch (error) {
     console.error("[rule-sets] GET /api/admin/rule-sets error:", error);
     return NextResponse.json(

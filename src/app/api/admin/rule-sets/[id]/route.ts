@@ -9,7 +9,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
+import { db } from "@/lib/db/client";
+import { agentDefinitions } from "@/lib/db/schema";
 import { ruleService } from "@/lib/services/rule-service";
 import type { UpdateSetInput } from "@/lib/services/rule-service";
 
@@ -54,7 +57,20 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ data: set });
+    // Fetch agent info if linked
+    let agentInfo: { agentKey: string; name: string } | null = null;
+    if (set.agentId) {
+      const agent = await db
+        .select({ agentKey: agentDefinitions.agentKey, name: agentDefinitions.name })
+        .from(agentDefinitions)
+        .where(eq(agentDefinitions.id, set.agentId))
+        .limit(1);
+      if (agent.length > 0) {
+        agentInfo = agent[0];
+      }
+    }
+
+    return NextResponse.json({ data: { ...set, agentInfo } });
   } catch (error) {
     console.error("[rule-sets] GET /api/admin/rule-sets/:id error:", error);
     return NextResponse.json(
