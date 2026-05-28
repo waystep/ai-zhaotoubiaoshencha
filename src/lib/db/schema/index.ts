@@ -954,3 +954,25 @@ export {
   presetModesRelations,
   agentCallLogsRelations,
 } from "./models";
+
+// ==================== 知识库管理（re-export from knowledge.ts） ====================
+
+export {
+  knowledgeBaseTypeEnum,
+  knowledgeBases,
+  knowledgeItems,
+  knowledgeItemChunks,
+  knowledgeBasesRelations,
+  knowledgeItemsRelations,
+  knowledgeItemChunksRelations,
+} from "./knowledge";
+
+// ==================== 规则集管理（re-export from rules.ts） ====================
+
+export {
+  ruleDetectionTypeEnum,
+  ruleSets,
+  ruleItems,
+  ruleSetsRelations,
+  ruleItemsRelations,
+} from "./rules";
