@@ -1,153 +1,149 @@
-import { auth } from "@/lib/auth/config";
-import { redirect } from "next/navigation";
-import { db } from "@/lib/db/client";
-import { tenderProjects } from "@/lib/db/schema";
-import { eq, count } from "drizzle-orm";
-import { FolderOpen, FileText, ClipboardCheck, Plus } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FolderOpen, Plus, RefreshCw } from "lucide-react";
+import { StatCards } from "@/components/dashboard/stat-cards";
+import { TenderAnalysisPanel } from "@/components/dashboard/tender-analysis";
+import { RiskInsightsPanel } from "@/components/dashboard/risk-insights";
+import { ModelUsagePanel } from "@/components/dashboard/model-usage";
+import { CallTrendsPanel } from "@/components/dashboard/call-trends";
+import { TeamActivityPanel } from "@/components/dashboard/team-activity";
+import { KnowledgeStatsPanel } from "@/components/dashboard/knowledge-stats";
+import type {
+  DashboardOverview,
+  TenderMetrics,
+  RiskInsights,
+  ModelUsage,
+  TeamActivity,
+  KnowledgeStats,
+} from "@/lib/services/dashboard-service";
 
-export default async function DashboardPage() {
-  const session = await auth();
+interface DashboardData {
+  overview: DashboardOverview;
+  tenderMetrics: TenderMetrics;
+  riskInsights: RiskInsights;
+  modelUsage: ModelUsage;
+  teamActivity: TeamActivity;
+  knowledgeStats: KnowledgeStats;
+}
 
-  if (!session) {
-    redirect("/login");
-  }
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 获取项目统计
-  let projectCount = 0;
-  try {
-    if (session.user?.orgId) {
-      const result = await db
-        .select({ count: count() })
-        .from(tenderProjects)
-        .where(eq(tenderProjects.orgId, session.user.orgId));
-      projectCount = result[0]?.count || 0;
+  async function loadDashboard() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/dashboard/overview", { cache: "no-store" });
+      if (!res.ok) throw new Error("请求失败");
+      const json = await res.json();
+      setData(json);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载仪表盘失败");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("获取统计失败:", error);
   }
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-h2">
-          欢迎回来，{session.user?.name}
-        </h2>
-        <p className="text-muted-foreground">
-          智能投标预审智能体 - AI驱动的文档审查与分析
-        </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-h2">控制台</h2>
+          <p className="text-muted-foreground">
+            智能投标预审平台 · 数据总览
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={loadDashboard} disabled={loading}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            刷新
+          </Button>
+          <Link href="/projects/new">
+            <Button size="sm">
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              新建项目
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">项目总数</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-stat">{projectCount}</div>
-            <p className="text-xs text-muted-foreground">
-              招标审查项目
-            </p>
-          </CardContent>
-        </Card>
+      {/* Error */}
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">待审查文档</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-stat">0</div>
-            <p className="text-xs text-muted-foreground">
-              等待审查的投标文件
-            </p>
-          </CardContent>
-        </Card>
+      {/* Row 1: Stat cards */}
+      <StatCards
+        overview={data?.overview ?? null}
+        knowledgeStats={data?.knowledgeStats ?? null}
+        modelUsage={data?.modelUsage ?? null}
+        loading={loading}
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">已完成审查</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-stat">0</div>
-            <p className="text-xs text-muted-foreground">
-              审查报告已生成
-            </p>
-          </CardContent>
-        </Card>
+      {/* Row 2: Call trends (full width) */}
+      <CallTrendsPanel
+        data={data?.modelUsage?.byDay ?? null}
+        loading={loading}
+      />
+
+      {/* Row 3: 3-column layout */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <TenderAnalysisPanel
+          data={data?.tenderMetrics ?? null}
+          loading={loading}
+        />
+        <RiskInsightsPanel
+          data={data?.riskInsights ?? null}
+          loading={loading}
+        />
+        <ModelUsagePanel
+          data={data?.modelUsage ?? null}
+          loading={loading}
+        />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>快速操作</CardTitle>
-            <CardDescription>
-              开始新的招标审查流程
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <Link href="/projects/new">
-              <Button variant="outline" className="w-full justify-start">
-                <FolderOpen className="mr-2 h-4 w-4" />
-                创建新项目
-                <Plus className="ml-auto h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/projects">
-              <Button variant="outline" className="w-full justify-start">
-                <FileText className="mr-2 h-4 w-4" />
-                查看项目列表
-              </Button>
-            </Link>
-            <Link href="/reports">
-              <Button variant="outline" className="w-full justify-start">
-                <ClipboardCheck className="mr-2 h-4 w-4" />
-                查看审查报告
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      {/* Row 4: 2-column layout */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <KnowledgeStatsPanel
+          data={data?.knowledgeStats ?? null}
+          loading={loading}
+        />
+        <TeamActivityPanel
+          data={data?.teamActivity ?? null}
+          loading={loading}
+        />
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>使用指南</CardTitle>
-            <CardDescription>
-              快速了解平台功能
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ol className="space-y-4 text-sm">
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                  1
-                </span>
-                <span>创建招标项目，设置项目基本信息</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                  2
-                </span>
-                <span>上传招标文件和法律规范性文件</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                  3
-                </span>
-                <span>上传投标文件，系统自动解析文档</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                  4
-                </span>
-                <span>AI智能审查，生成详细审查报告</span>
-              </li>
-            </ol>
-          </CardContent>
-        </Card>
+      {/* Quick links */}
+      <div className="flex flex-wrap gap-2">
+        <Link href="/projects">
+          <Button variant="outline" size="sm">
+            <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+            项目列表
+          </Button>
+        </Link>
+        <Link href="/analytics">
+          <Button variant="outline" size="sm">
+            详细统计
+          </Button>
+        </Link>
+        <Link href="/admin/models">
+          <Button variant="outline" size="sm">
+            模型管理
+          </Button>
+        </Link>
       </div>
     </div>
   );
