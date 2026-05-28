@@ -628,7 +628,7 @@ export default function TenderAnalysisPage() {
             <Shield className="mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 text-h5">尚未提取审查项</h3>
             <p className="text-muted-foreground text-center mb-4">
-              点击"重新解析"按钮，A1 智能体将自动提取审查项
+              点击「重新解析」按钮，A1 智能体将自动提取审查项
             </p>
             <Button onClick={handleTriggerParsing} disabled={triggering}>
               {triggering ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-4 w-4" />}

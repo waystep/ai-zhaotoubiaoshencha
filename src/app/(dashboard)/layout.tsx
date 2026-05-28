@@ -1,34 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { AppHeader } from "@/components/layout/app-header";
+import { Sidebar } from "@/components/layout/sidebar";
+import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
 import {
-  ClipboardCheck,
-  FileText,
-  Loader2,
-  LogOut,
-  Plus,
-} from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
+  businessSections,
+  adminSections,
+  buildProjectSection,
+  deriveActiveTab,
+  deriveDefaultRoute,
+} from "@/lib/nav/sidebar-config";
+import type { SidebarSection } from "@/lib/nav/sidebar-config";
 
 type ProjectOption = {
   id: string;
@@ -39,12 +24,6 @@ type ProjectOption = {
 type ProjectApiItem = ProjectOption & {
   [key: string]: unknown;
 };
-
-function navItemIsActive(pathname: string, href: string): boolean {
-  const baseHref = href.split("?")[0] || href;
-  if (pathname === baseHref) return true;
-  return baseHref !== "/" && pathname.startsWith(`${baseHref}/`);
-}
 
 function selectedProjectIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/projects\/([^/]+)/);
@@ -58,49 +37,6 @@ function projectsRouteSegment(pathname: string): string | null {
   return match?.[1] ?? null;
 }
 
-function SidebarNavLink({
-  href,
-  pathname,
-  name,
-  icon: Icon,
-  pendingHref,
-  onNavigateIntent,
-}: {
-  href: string;
-  pathname: string;
-  name: string;
-  icon: LucideIcon;
-  pendingHref: string | null;
-  onNavigateIntent: (href: string) => void;
-}) {
-  const isActive = navItemIsActive(pathname, href);
-  const isPending = pendingHref === href;
-
-  return (
-    <Link
-      href={href}
-      aria-current={isActive ? "page" : undefined}
-      aria-busy={isPending}
-      onClick={() => onNavigateIntent(href)}
-      className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
-        "active:scale-[0.98] motion-reduce:active:scale-100",
-        isActive
-          ? "bg-primary/10 text-primary font-medium"
-          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-        isPending && "bg-muted/50 text-foreground"
-      )}
-    >
-      {isPending ? (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden />
-      ) : (
-        <Icon className="h-4 w-4 shrink-0" aria-hidden />
-      )}
-      {name}
-    </Link>
-  );
-}
-
 export default function DashboardLayout({
   children,
 }: {
@@ -109,21 +45,32 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Hydrate sidebar collapse state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved === "true") setIsCollapsed(true);
+  }, []);
 
   const selectedProjectId = selectedProjectIdFromPath(pathname);
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId]
+    () => projects.find((p) => p.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
   );
 
-  /** 路径里 /projects/:id 段变化时重新拉列表（如从「新建」进入新项目），避免 header 下拉仍为旧数据 */
+  const activeTab = deriveActiveTab(pathname);
+
   const projectListFetchKey = useMemo(
     () => `${session?.user?.id ?? ""}:${projectsRouteSegment(pathname) ?? ""}`,
-    [pathname, session?.user?.id]
+    [pathname, session?.user?.id],
   );
 
+  // Fetch project list
   useEffect(() => {
     let ignore = false;
     async function fetchProjects() {
@@ -133,171 +80,87 @@ export default function DashboardLayout({
         const data = await response.json();
         if (ignore) return;
         setProjects(
-          ((data.projects ?? []) as ProjectApiItem[]).map((project) => ({
-            id: project.id,
-            name: project.name,
-            projectNo: project.projectNo,
-          }))
+          ((data.projects ?? []) as ProjectApiItem[]).map((p) => ({
+            id: p.id,
+            name: p.name,
+            projectNo: p.projectNo,
+          })),
         );
       } catch (error) {
         console.error("获取项目列表失败:", error);
       }
     }
-
     void fetchProjects();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [projectListFetchKey]);
 
+  // Clear pending nav on route change
   useEffect(() => {
     setPendingNavHref(null);
+    setIsMobileOpen(false);
   }, [pathname]);
 
+  // Derive sidebar sections based on active tab
+  const sections = activeTab === "business" ? businessSections : adminSections;
+  const projectSection: SidebarSection | null =
+    selectedProjectId && selectedProject
+      ? buildProjectSection(selectedProjectId, selectedProject.name)
+      : null;
+
   function handleSidebarNavIntent(href: string) {
-    if (navItemIsActive(pathname, href)) return;
+    if (pathname === href || pathname === href.split("?")[0]) return;
     setPendingNavHref(href);
   }
 
-  const projectNavigation = selectedProjectId
-    ? [
-        {
-          name: "文档管理",
-          href: `/projects/${selectedProjectId}/documents`,
-          icon: FileText,
-        },
-        {
-          name: "审查项",
-          href: `/projects/${selectedProjectId}/extraction-items`,
-          icon: ClipboardCheck,
-        },
-        {
-          name: "审查报告",
-          href: `/projects/${selectedProjectId}/reports`,
-          icon: ClipboardCheck,
-        },
-      ]
-    : [];
+  function handleTabChange(tab: "business" | "admin") {
+    router.push(deriveDefaultRoute(tab));
+  }
+
+  function handleToggleCollapse() {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebar-collapsed", String(next));
+      return next;
+    });
+  }
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* 统一的顶部 Header - 全宽 */}
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur shrink-0">
-        <div className="flex items-center gap-4 px-6 h-14">
-          {/* Logo */}
-          <Link href="/projects" className="flex items-center gap-2.5 rounded-lg shrink-0">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ClipboardCheck className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-semibold">智能投标预审智能体</span>
-          </Link>
+      <AppHeader
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        userName={session?.user?.name}
+        userEmail={session?.user?.email}
+        userImage={session?.user?.image}
+        onToggleMobileSidebar={() => setIsMobileOpen(true)}
+      />
 
-          {/* 项目选择器 + 用户信息 - 靠右 */}
-          <div className="flex items-center gap-3 ml-auto">
-            <Select
-              value={selectedProjectId ?? ""}
-              onValueChange={(projectId) => {
-                if (projectId === "__new") {
-                  router.push("/projects/new");
-                  return;
-                }
-                router.push(`/projects/${projectId}/documents`);
-              }}
-            >
-              <SelectTrigger className="h-9 w-[280px] bg-card">
-                <SelectValue placeholder="选择项目" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    <span className="block truncate">{project.name}</span>
-                  </SelectItem>
-                ))}
-                <SelectItem value="__new">创建新项目</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={session?.user?.image || ""} />
-                    <AvatarFallback>{session?.user?.name?.[0] || "U"}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="px-2 py-1.5">
-                  <div className="truncate text-sm font-medium">
-                    {session?.user?.name || "User"}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {session?.user?.email}
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">设置</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => signOut({ callbackUrl: "/" })}
-                  className="text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  退出登录
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
-
-      {/* 下方：Sidebar + Main 并排（仅在进入项目后才展示侧栏） */}
       <div className="flex min-h-0 flex-1">
-        {selectedProjectId && (
-          <aside className="flex w-56 shrink-0 flex-col border-r bg-card/50">
-          <nav className="flex-1 space-y-1 p-3">
-            {/* 项目工作区 */}
-            {selectedProjectId && (
-              <>
-                <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
-                  项目工作区
-                </div>
-                {projectNavigation.map((item) => (
-                  <SidebarNavLink
-                    key={item.name}
-                    href={item.href}
-                    pathname={pathname}
-                    name={item.name}
-                    icon={item.icon}
-                    pendingHref={pendingNavHref}
-                    onNavigateIntent={handleSidebarNavIntent}
-                  />
-                ))}
-              </>
-            )}
+        <Sidebar
+          sections={sections}
+          projectSection={projectSection}
+          pathname={pathname}
+          pendingHref={pendingNavHref}
+          onNavigateIntent={handleSidebarNavIntent}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+          isMobileOpen={isMobileOpen}
+          onMobileClose={() => setIsMobileOpen(false)}
+          showCreateProject={activeTab === "business"}
+        />
 
-          </nav>
-
-          <div className="border-t p-3">
-            <Link href="/projects/new">
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <Plus className="mr-2 h-4 w-4" />
-                创建项目
-              </Button>
-            </Link>
-          </div>
-        </aside>
-        )}
-
-        {/* 主内容区域 */}
         <main className="flex min-w-0 flex-1 flex-col relative">
           <div
             id="dashboard-scroll"
             className="absolute inset-0 overflow-auto [scrollbar-gutter:stable]"
           >
-            {children}
+            <div className="px-6 py-4">
+              <BreadcrumbNav
+                pathname={pathname}
+                projectName={selectedProject?.name ?? null}
+              />
+              {children}
+            </div>
           </div>
         </main>
       </div>

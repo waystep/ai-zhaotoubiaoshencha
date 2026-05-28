@@ -295,7 +295,7 @@ export default function IntegrationsPage() {
           <CardContent className="py-8 text-center text-muted-foreground">
             <Webhook className="mx-auto h-8 w-8 mb-2 opacity-50" />
             <p>暂无 Webhook 配置</p>
-            <p className="text-xs mt-1">点击"新建 Webhook"开始配置事件推送</p>
+            <p className="text-xs mt-1">点击「新建 Webhook」开始配置事件推送</p>
           </CardContent>
         </Card>
       ) : (
@@ -414,7 +414,7 @@ export default function IntegrationsPage() {
             <CardContent>
               {!logsWebhookId ? (
                 <div className="text-sm text-muted-foreground text-center py-8">
-                  点击 Webhook 卡片上的"日志"按钮查看
+                  点击 Webhook 卡片上的「日志」按钮查看
                 </div>
               ) : logsLoading ? (
                 <div className="text-sm text-muted-foreground">加载中...</div>

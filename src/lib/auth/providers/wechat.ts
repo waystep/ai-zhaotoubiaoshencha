@@ -254,7 +254,8 @@ export const WeChatOAuthProvider = Credentials({
         orgId: membership?.orgId || undefined,
         // Custom flag: frontend should redirect to phone binding if true
         needsPhoneBinding,
-      } as unknown as Awaited<ReturnType<NonNullable<typeof credentials>>>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
     } catch (err) {
       console.error("[wechat] OAuth authorize error:", err);
 

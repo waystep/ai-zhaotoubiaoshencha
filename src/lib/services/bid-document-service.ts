@@ -257,7 +257,7 @@ function htmlToTextParagraphs(html: string): string[] {
   if (!html) return [];
 
   // Replace block-level tags with newline markers
-  let text = html
+  const text = html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<\/div>/gi, "\n")

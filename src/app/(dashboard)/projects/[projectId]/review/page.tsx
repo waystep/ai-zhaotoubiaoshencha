@@ -732,7 +732,7 @@ export default function EnhancedReviewPage() {
             <Clock className="mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 text-h5">等待审查</h3>
             <p className="text-muted-foreground text-center mb-4">
-              审查任务已创建，点击"重新审查"开始分析
+              审查任务已创建，点击「重新审查」开始分析
             </p>
             <Button onClick={handleReTrigger} disabled={reTriggering}>
               {reTriggering ? (

@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>v0.0.2 页面结构原型 — 顶栏Tab+左右布局</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #ffffff;
+    --bg-subtle: #f8f9fb;
+    --bg-muted: #f1f3f5;
+    --sidebar-bg: #fafbfc;
+    --border: #e5e7eb;
+    --border-light: #f1f3f5;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --primary: #4f46e5;
+    --primary-light: #eef2ff;
+    --primary-hover: #4338ca;
+    --success: #10b981;
+    --success-bg: #ecfdf5;
+    --warning: #f59e0b;
+    --warning-bg: #fffbeb;
+    --danger: #ef4444;
+    --danger-bg: #fef2f2;
+    --info: #3b82f6;
+    --info-bg: #eff6ff;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --header-h: 56px;
+    --sidebar-w: 230px;
+  }
+
+  body {
+    font-family: 'Noto Sans SC', 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ===== TOP HEADER ===== */
+  .top-header {
+    height: var(--header-h);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 20;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-logo {
+    width: 32px; height: 32px;
+    background: var(--primary);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-size: 15px; font-weight: 600; white-space: nowrap;
+  }
+
+  /* Top nav tabs */
+  .header-nav {
+    display: flex;
+    gap: 0;
+    margin-left: 24px;
+  }
+
+  .header-nav-item {
+    padding: 0 16px;
+    height: var(--header-h);
+    display: flex;
+    align-items: center;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .header-nav-item:hover {
+    color: var(--text);
+  }
+
+  .header-nav-item.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-icon-btn {
+    width: 36px; height: 36px;
+    border-radius: var(--radius);
+    border: none; background: transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary);
+    position: relative;
+    transition: background 0.15s;
+  }
+
+  .header-icon-btn:hover { background: var(--bg-muted); }
+
+  .header-icon-btn .notif-dot {
+    position: absolute; top: 6px; right: 6px;
+    width: 7px; height: 7px;
+    background: var(--danger); border-radius: 50%;
+    border: 2px solid var(--bg);
+  }
+
+  .header-user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px 4px 4px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .header-user:hover { background: var(--bg-muted); }
+
+  .header-user .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--primary-light); color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px;
+  }
+
+  .header-user .user-name { font-weight: 500; font-size: 13px; }
+
+  .header-user .user-role { font-size: 11px; color: var(--text-muted); }
+
+  /* ===== BODY ===== */
+  .body-wrap {
+    margin-top: var(--header-h);
+    display: flex;
+    min-height: calc(100vh - var(--header-h));
+  }
+
+  /* ===== LEFT SIDEBAR ===== */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: var(--header-h); left: 0; bottom: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 0;
+  }
+
+  /* Project selector inside sidebar */
+  .sidebar-project {
+    margin: 0 12px 12px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.15s;
+  }
+
+  .sidebar-project:hover { border-color: var(--primary); }
+
+  .sidebar-project .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%; background: var(--success);
+  }
+
+  .sidebar-project .name {
+    font-weight: 500; font-size: 13px; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .sidebar-project .chevron { color: var(--text-muted); font-size: 10px; }
+
+  .sidebar-section {
+    padding: 12px 12px 4px;
+  }
+
+  .sidebar-section-title {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 8px;
+    margin-bottom: 4px;
+  }
+
+  .sidebar-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-decoration: none;
+  }
+
+  .sidebar-item:hover { background: var(--bg-muted); color: var(--text); }
+
+  .sidebar-item.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  .sidebar-item .icon {
+    width: 18px; height: 18px; opacity: 0.6; flex-shrink: 0;
+  }
+
+  .sidebar-item.active .icon { opacity: 1; }
+
+  .sidebar-item .label {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .sidebar-item .badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .sidebar-item .badge.danger { background: var(--danger); color: white; }
+  .sidebar-item .badge.muted { background: var(--bg-muted); color: var(--text-muted); }
+  .sidebar-item .badge.success { background: var(--success-bg); color: var(--success); }
+
+  /* ===== MAIN CONTENT ===== */
+  .main {
+    flex: 1;
+    margin-left: var(--sidebar-w);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .sub-header {
+    height: 48px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 24px; gap: 16px;
+    background: var(--bg);
+    position: sticky;
+    top: var(--header-h);
+    z-index: 5;
+  }
+
+  .breadcrumb {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--text-muted);
+  }
+
+  .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--primary); }
+  .breadcrumb .sep { color: var(--border); }
+  .breadcrumb .current { color: var(--text); font-weight: 500; }
+
+  .sub-header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: inherit;
+  }
+
+  .btn:hover { background: var(--bg-muted); }
+
+  .btn-primary {
+    background: var(--primary); color: white;
+    border-color: var(--primary);
+  }
+
+  .btn-primary:hover { background: var(--primary-hover); }
+
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .content { padding: 24px; max-width: 1400px; }
+
+  /* ===== WORKFLOW ===== */
+  .workflow-steps {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .wf-step {
+    flex: 1;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-right: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .wf-step:last-child { border-right: none; }
+  .wf-step:hover { background: var(--bg-subtle); }
+  .wf-step.active { background: var(--primary-light); }
+
+  .wf-step .num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .wf-step.active .num { background: var(--primary); border-color: var(--primary); color: white; }
+  .wf-step.done .num { background: var(--success); border-color: var(--success); color: white; }
+
+  .wf-step .info { min-width: 0; }
+
+  .wf-step .s-title {
+    font-weight: 500; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .wf-step .s-status { font-size: 11px; color: var(--text-muted); }
+  .wf-step.active .s-status { color: var(--primary); }
+
+  /* ===== STAT CARDS ===== */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    position: relative;
+  }
+
+  .stat-card .stat-label {
+    font-size: 12px; color: var(--text-secondary);
+    font-weight: 500; margin-bottom: 6px;
+  }
+
+  .stat-card .stat-value {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
+  }
+
+  .stat-card .stat-sub {
+    font-size: 11px; color: var(--text-muted); margin-top: 2px;
+  }
+
+  .stat-card .stat-icon {
+    position: absolute; top: 14px; right: 14px;
+    width: 34px; height: 34px;
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-body { padding: 18px; }
+
+  .grid-3-1 {
+    display: grid;
+    grid-template-columns: 5fr 3fr;
+    gap: 14px;
+  }
+
+  .tabs { display: flex; gap: 2px; }
+
+  .tab {
+    padding: 5px 10px;
+    font-size: 12px; font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  .tab:hover { color: var(--text); background: var(--bg-muted); }
+  .tab.active { color: var(--primary); background: var(--primary-light); }
+
+  /* ===== ISSUE LIST ===== */
+  .issue {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .issue:last-child { border-bottom: none; }
+
+  .sev-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%; margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  .sev-dot.critical { background: var(--danger); }
+  .sev-dot.major { background: var(--warning); }
+  .sev-dot.minor { background: var(--info); }
+
+  .issue-body { flex: 1; min-width: 0; }
+  .issue-title { font-weight: 500; font-size: 13px; margin-bottom: 2px; }
+
+  .issue-desc {
+    font-size: 12px; color: var(--text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .issue-tags { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+
+  .tag {
+    font-size: 11px; padding: 1px 6px; border-radius: 4px;
+    background: var(--bg-muted); color: var(--text-secondary);
+  }
+
+  .tag.sev-c { background: var(--danger-bg); color: var(--danger); }
+  .tag.sev-m { background: var(--warning-bg); color: var(--warning); }
+  .tag.sev-l { background: var(--info-bg); color: var(--info); }
+  .tag.warn { background: var(--danger-bg); color: var(--danger); font-weight: 500; }
+
+  /* ===== AGENT ===== */
+  .agent {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .agent:last-child { border-bottom: none; }
+
+  .agent .a-icon {
+    width: 32px; height: 32px;
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .agent .a-info { flex: 1; min-width: 0; }
+  .agent .a-name { font-weight: 500; font-size: 13px; }
+  .agent .a-desc { font-size: 11px; color: var(--text-muted); }
+
+  .agent .a-status {
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 10px; font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .a-status.done { background: var(--success-bg); color: var(--success); }
+  .a-status.running { background: var(--info-bg); color: var(--info); }
+  .a-status.idle { background: var(--bg-muted); color: var(--text-muted); }
+
+  .risk-bar { display: flex; gap: 4px; margin-bottom: 10px; }
+  .risk-bar .seg { height: 8px; border-radius: 4px; }
+  .risk-legend { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+
+  .section-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--text-secondary);
+    margin: 14px 0 8px;
+  }
+
+  .page-label {
+    position: fixed; bottom: 16px; right: 16px;
+    background: var(--primary); color: white;
+    padding: 6px 14px; border-radius: var(--radius);
+    font-size: 11px; font-weight: 500; z-index: 100;
+  }
+
+  /* ===== TAB SWITCH VISIBILITY ===== */
+  .sidebar-panel { display: none; }
+  .sidebar-panel.visible { display: block; }
+
+  /* Highlight the switched tab in prototype */
+  .header-nav-item.active-tab-a { color: var(--primary); border-bottom-color: var(--primary); }
+</style>
+</head>
+<body>
+
+<!-- ===== TOP HEADER ===== -->
+<header class="top-header">
+  <div class="header-left">
+    <div class="header-logo">审</div>
+    <span class="header-title">智能投标预审平台</span>
+
+    <!-- Top nav tabs -->
+    <div class="header-nav">
+      <div class="header-nav-item active-tab-a" onclick="switchTab('biz')">业务功能</div>
+      <div class="header-nav-item" onclick="switchTab('admin')">后台设置</div>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <button class="header-icon-btn" title="搜索">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </button>
+    <button class="header-icon-btn" title="通知">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notif-dot"></span>
+    </button>
+    <div class="header-user">
+      <div class="avatar">张</div>
+      <div>
+        <div class="user-name">张伟</div>
+        <div class="user-role">投标部 · 高级工程师</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== BODY ===== -->
+<div class="body-wrap">
+
+  <!-- LEFT SIDEBAR -->
+  <nav class="sidebar">
+
+    <!-- ===== BIZ sidebar panel ===== -->
+    <div class="sidebar-panel visible" id="sidebar-biz">
+      <div class="sidebar-project">
+        <div class="dot"></div>
+        <span class="name">浦东新区道路改造工程</span>
+        <span class="chevron">▾</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">概览</div>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span class="label">控制台</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h16Z"/></svg>
+          <span class="label">全部项目</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">项目工作区</div>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="label">上传文件</span>
+          <span class="badge success">完成</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+          <span class="label">文档管理</span>
+          <span class="badge muted">3</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span class="label">招标解析</span>
+          <span class="badge success">完成</span>
+        </a>
+        <a class="sidebar-item active" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+          <span class="label">投标预审</span>
+          <span class="badge danger">2</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/></svg>
+          <span class="label">投标编制</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span class="label">审查报告</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- ===== ADMIN sidebar panel ===== -->
+    <div class="sidebar-panel" id="sidebar-admin">
+      <div class="sidebar-section" style="padding-top:16px;">
+        <div class="sidebar-section-title">数据管理</div>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+          <span class="label">知识库</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span class="label">审查规则</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="label">数据导入</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">AI 配置</div>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M2 14h20v6H2z"/></svg>
+          <span class="label">模型管理</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="label">智能体配置</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="label">预设模式</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">系统集成</div>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span class="label">Webhook 管理</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+          <span class="label">SSO 认证</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">系统</div>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="label">系统设置</span>
+        </a>
+        <a class="sidebar-item" href="#">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span class="label">操作日志</span>
+        </a>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- RIGHT CONTENT -->
+  <main class="main">
+    <div class="sub-header">
+      <div class="breadcrumb">
+        <a href="#">全部项目</a>
+        <span class="sep">/</span>
+        <a href="#">浦东新区道路改造工程</a>
+        <span class="sep">/</span>
+        <span class="current">投标预审</span>
+      </div>
+      <div class="sub-header-actions">
+        <button class="btn btn-sm">导出报告</button>
+        <button class="btn btn-sm btn-primary">+ 新建审查</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="workflow-steps">
+        <div class="wf-step done">
+          <div class="num">✓</div>
+          <div class="info"><div class="s-title">上传文件</div><div class="s-status">3 个文件</div></div>
+        </div>
+        <div class="wf-step done">
+          <div class="num">✓</div>
+          <div class="info"><div class="s-title">招标解析</div><div class="s-status">28 条要点</div></div>
+        </div>
+        <div class="wf-step active">
+          <div class="num">3</div>
+          <div class="info"><div class="s-title">投标预审</div><div class="s-status">进行中 · A3/A4 运行</div></div>
+        </div>
+        <div class="wf-step">
+          <div class="num">4</div>
+          <div class="info"><div class="s-title">投标编制</div><div class="s-status">待开始</div></div>
+        </div>
+        <div class="wf-step">
+          <div class="num">5</div>
+          <div class="info"><div class="s-title">审查报告</div><div class="s-status">待开始</div></div>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--danger-bg);color:var(--danger);">⚠️</div>
+          <div class="stat-label">严重风险</div>
+          <div class="stat-value">3</div>
+          <div class="stat-sub">↑ 较上次增加 1 项</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--warning-bg);color:var(--warning);">📋</div>
+          <div class="stat-label">检查要点</div>
+          <div class="stat-value">28</div>
+          <div class="stat-sub">7 类完整覆盖</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--success-bg);color:var(--success);">✅</div>
+          <div class="stat-label">合规通过率</div>
+          <div class="stat-value">82%</div>
+          <div class="stat-sub">↑ 5 项已通过</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--info-bg);color:var(--info);">🎯</div>
+          <div class="stat-label">废标风险</div>
+          <div class="stat-value">12%</div>
+          <div class="stat-sub">需关注 3 项</div>
+        </div>
+      </div>
+
+      <div class="grid-3-1">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">风险问题</div>
+            <div class="tabs">
+              <div class="tab active">全部 (11)</div>
+              <div class="tab">严重 (3)</div>
+              <div class="tab">重要 (4)</div>
+              <div class="tab">轻微 (4)</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="issue">
+              <div class="sev-dot critical"></div>
+              <div class="issue-body">
+                <div class="issue-title">投标保证金金额不满足要求</div>
+                <div class="issue-desc">招标文件要求保证金 80 万元，投标文件中保证金为 50 万元，差额 30 万元。</div>
+                <div class="issue-tags">
+                  <span class="tag sev-c">严重</span>
+                  <span class="tag">商务标 · P12</span>
+                  <span class="tag warn">废标风险</span>
+                </div>
+              </div>
+            </div>
+            <div class="issue">
+              <div class="sev-dot critical"></div>
+              <div class="issue-body">
+                <div class="issue-title">项目经理资质证书过期</div>
+                <div class="issue-desc">项目经理建造师证书有效期至 2026-03-15，已过期。需更换项目经理或提供续期证明。</div>
+                <div class="issue-tags">
+                  <span class="tag sev-c">严重</span>
+                  <span class="tag">资质 · P28</span>
+                </div>
+              </div>
+            </div>
+            <div class="issue">
+              <div class="sev-dot critical"></div>
+              <div class="issue-body">
+                <div class="issue-title">投标函缺少法定代表人签字</div>
+                <div class="issue-desc">投标函仅盖有公章，缺少法定代表人或授权代表签字，不符合招标文件要求。</div>
+                <div class="issue-tags">
+                  <span class="tag sev-c">严重</span>
+                  <span class="tag">格式 · P3</span>
+                  <span class="tag warn">废标风险</span>
+                </div>
+              </div>
+            </div>
+            <div class="issue">
+              <div class="sev-dot major"></div>
+              <div class="issue-body">
+                <div class="issue-title">类似项目业绩数量不足</div>
+                <div class="issue-desc">要求提供 5 个类似项目业绩，当前仅提供 3 个，影响评分项得分。</div>
+                <div class="issue-tags">
+                  <span class="tag sev-m">重要</span>
+                  <span class="tag">业绩 · P35</span>
+                </div>
+              </div>
+            </div>
+            <div class="issue">
+              <div class="sev-dot major"></div>
+              <div class="issue-body">
+                <div class="issue-title">施工组织设计缺少安全专项方案</div>
+                <div class="issue-desc">深基坑工程需包含安全专项施工方案，当前文档中未发现相关内容。</div>
+                <div class="issue-tags">
+                  <span class="tag sev-m">重要</span>
+                  <span class="tag">技术 · P48</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">智能体状态</div>
+            </div>
+            <div class="card-body">
+              <div class="agent">
+                <div class="a-icon" style="background:#ecfdf5;color:#10b981;">A1</div>
+                <div class="a-info"><div class="a-name">招标解析</div><div class="a-desc">28 条审查要点已提取</div></div>
+                <span class="a-status done">完成</span>
+              </div>
+              <div class="agent">
+                <div class="a-icon" style="background:#eff6ff;color:#3b82f6;">A3</div>
+                <div class="a-info"><div class="a-name">投标预审</div><div class="a-desc">正在检查第 4/7 维度…</div></div>
+                <span class="a-status running">运行中</span>
+              </div>
+              <div class="agent">
+                <div class="a-icon" style="background:#eff6ff;color:#3b82f6;">A4</div>
+                <div class="a-info"><div class="a-name">风险定位</div><div class="a-desc">定位中…</div></div>
+                <span class="a-status running">运行中</span>
+              </div>
+              <div class="agent">
+                <div class="a-icon" style="background:#f1f3f5;color:#9ca3af;">A5</div>
+                <div class="a-info"><div class="a-name">法律解析</div><div class="a-desc">等待预审完成</div></div>
+                <span class="a-status idle">等待</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">风险分布</div>
+            </div>
+            <div class="card-body">
+              <div class="risk-bar">
+                <div class="seg" style="flex:3;background:var(--danger);"></div>
+                <div class="seg" style="flex:4;background:var(--warning);"></div>
+                <div class="seg" style="flex:4;background:var(--info);"></div>
+              </div>
+              <div class="risk-legend">
+                <span>🔴 严重 3</span>
+                <span>🟡 重要 4</span>
+                <span>🔵 轻微 4</span>
+              </div>
+              <div class="section-label">问题类别</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                <span class="tag sev-c">废标风险 2</span>
+                <span class="tag sev-m">资质 1</span>
+                <span class="tag sev-m">业绩 2</span>
+                <span class="tag sev-l">技术 3</span>
+                <span class="tag sev-l">格式 2</span>
+                <span class="tag sev-c">商务 1</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="page-label">v0.0.2 · 点击顶部「业务功能 / 后台设置」切换侧边栏</div>
+
+<script>
+function switchTab(tab) {
+  const bizPanel = document.getElementById('sidebar-biz');
+  const adminPanel = document.getElementById('sidebar-admin');
+  const navItems = document.querySelectorAll('.header-nav-item');
+
+  navItems.forEach((item, i) => {
+    if ((tab === 'biz' && i === 0) || (tab === 'admin' && i === 1)) {
+      item.classList.add('active-tab-a');
+    } else {
+      item.classList.remove('active-tab-a');
+    }
+  });
+
+  if (tab === 'biz') {
+    bizPanel.classList.add('visible');
+    adminPanel.classList.remove('visible');
+  } else {
+    bizPanel.classList.remove('visible');
+    adminPanel.classList.add('visible');
+  }
+}
+</script>
+
+</body>
+</html>
