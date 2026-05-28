@@ -12,6 +12,7 @@ import {
   customType,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+export { loginMethodEnum, smsPurposeEnum } from "./enums";
 
 // ==================== 枚举定义 ====================
 
@@ -115,6 +116,8 @@ export const bidStatusEnum = pgEnum("bid_status", [
 
 // ==================== 用户与认证 ====================
 
+import { loginMethodEnum } from "./enums";
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -122,8 +125,15 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }),
   avatar: text("avatar"),
   passwordHash: text("password_hash"),
-  // 新增字段
-  phone: varchar("phone", { length: 50 }),
+  // 手机号
+  phone: varchar("phone", { length: 20 }),
+  phoneVerified: timestamp("phone_verified"),
+  // 账号状态
+  isActive: boolean("is_active").default(true),
+  // 登录信息
+  lastLoginAt: timestamp("last_login_at"),
+  lastLoginMethod: loginMethodEnum("last_login_method"),
+  // 角色 & 专家信息
   role: userRoleEnum("role").default("supplier_staff"),
   expertInfo: jsonb("expert_info").default({}),  // 专家信息（资质、专业领域等）
   createdAt: timestamp("created_at").defaultNow(),
@@ -916,3 +926,15 @@ export const bidSubmissionsRelations = relations(bidSubmissions, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// ==================== 认证扩展（re-export from auth.ts） ====================
+
+export {
+  smsVerificationCodes,
+  userOAuthIdentities,
+  ssoConfigurations,
+  loginLogs,
+  loginLockouts,
+  userOAuthIdentitiesRelations,
+  loginLogsRelations,
+} from "./auth";
