@@ -8,6 +8,8 @@ import postgres from "postgres";
 
 import * as schema from "./schema";
 import { organizationMembers, organizations, users } from "./schema";
+import { seedAgents } from "./seed/agents";
+import { seedModels } from "./seed/models";
 
 function getSeedConnectionString() {
   if (process.env.DATABASE_URL) {
@@ -127,6 +129,10 @@ async function main() {
   const org = await upsertDemoOrg();
   const admin = await upsertAdminUser();
   await ensureMembership(org.id, admin.id);
+
+  // Seed preset agents and default models
+  await seedModels(db);
+  await seedAgents(db);
 
   console.log("Seed completed.");
   console.log(`Admin URL: ${process.env.NEXT_PUBLIC_APP_URL || process.env.AUTH_URL || "http://localhost:3000"}/login`);
