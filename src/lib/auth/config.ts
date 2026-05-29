@@ -12,6 +12,7 @@ import { FeishuOAuthProvider } from "@/lib/auth/providers/feishu";
 import { WeChatOAuthProvider } from "@/lib/auth/providers/wechat";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   adapter: DrizzleAdapter(db),
   providers: [
     GitHub({
